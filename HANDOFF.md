@@ -165,7 +165,7 @@ Next concrete step for a new developer: create a Vercel project pointed at this 
 
    Runnable check for the math: `npx tsx src/lib/habits.check.ts`.
 2. **Same-day review edit vs. permanent lock.** Currently editable same-day (upsert + item replace). Never explicitly confirmed with the user — the original plan raised this as an open question and it defaulted to "editable" without a decision being made.
-3. **Analytics vs. Dashboard overlap.** Two screens now show similar completion-trend content. Never reconciled against the plan's original separate definitions (Analytics = deep per-habit/streak/invalid-miss metrics; Dashboard = at-a-glance overview). Worth explicitly deciding what's unique to each.
+3. **Analytics vs. Dashboard split — RESOLVED.** Dashboard is at-a-glance (today's completion %, active-habit count, current week bar chart, latest reflection). Analytics is deep metrics (windowed rate, important-habit consistency, per-habit streaks + invalid-miss count, day-score trend). Bar charts are the only visual overlap — Dashboard shows 7 days of raw completion volume, Analytics shows 30/90/365d of scored review outcomes, and they answer different questions. No further reconciliation needed.
 4. **Reset/Start Fresh + full JSON export** — specified in detail in the plan (mandatory PDF-before-wipe), not built. Only the narrower Reflections-only PDF export exists.
 5. **Habit reordering** — `sort_order` column exists and is dormant. No drag-and-drop UI. List order is currently `created_at`.
 6. **Rate limiting on `/api/v1/*`** — deliberately deferred per plan. `@upstash/ratelimit` is the noted drop-in if abuse ever shows up. Not urgent pre-launch given expected traffic.
