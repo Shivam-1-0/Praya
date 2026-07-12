@@ -1,0 +1,166 @@
+# Praya — Developer Handoff
+
+Written for someone with zero context picking this up cold. Covers architecture, data model, what's built, what's not, every bug we hit, and every decision still open.
+
+Reference docs: `CLAUDE.md` (load-bearing rules, read first), `~/.claude/plans/okay-this-sounds-right-hidden-dragonfly.md` (the original approved architecture plan this build follows).
+
+---
+
+## 1. What Praya is
+
+A multi-tenant habit tracker + daily task manager with an execution-first loop: **Plan → Execute → Reflect → Review → Improve**. Rebuild of a prior personal app that broke repeatedly when built via Google AI Studio's app-generator. This rebuild is hand-written, not tool-generated.
+
+Three deliberate scope changes from the original single-user brief:
+1. **Multi-tenant SaaS** — built for many users, not one.
+2. **Automation API** — external tools (n8n, etc.) can pull a user's own data via API key.
+3. **"Obsidian Gold" visual theme** — dark, single-gold-accent, no light mode.
+
+Notion/Calendar integrations are explicitly out of scope.
+
+---
+
+## 2. Stack & repo layout
+
+- **Next.js 16** (App Router, Turbopack dev). **Important Next 16 rename**: middleware lives at `src/proxy.ts`, exported function is `proxy` not `middleware`. Don't "fix" this back to Next 15 convention.
+- **Supabase**: Postgres + Auth (magic link) + RLS. No Storage buckets yet (nothing needs file upload).
+- **Vercel**: NOT YET DEPLOYED. Everything so far has only run against `localhost:3001` + the real Supabase project. This is the single biggest gap — see §8.
+- **Gemini API**: NOT YET WIRED. Zero integration exists. `GEMINI_API_KEY` isn't even in `.env.local`.
+- Repo: `C:\Users\shiva\praya` (lowercase — npm package names can't have capital letters, this is cosmetic only, Windows is case-insensitive). Own git repo, sibling to `Internship Copilot`, fully independent — no shared Supabase project, no shared code.
+- **shadcn/ui**: style `base-nova`, base color `neutral`. Component primitives come from **`@base-ui/react`, NOT Radix**. This matters: Base UI's `Button` uses a `render` prop for polymorphism, not `asChild`, and throws a console warning unless you also pass `nativeButton={false}` when rendering it as a non-`<button>` element (e.g. wrapping a `<Link>`). We hit this bug once already (see §7).
+- **Styling**: Tailwind 4, CSS-variable theme in `src/app/globals.css`. Single `:root` block — no `.dark` class, no toggle. Deliberately dark-only.
+
+### Git state — important
+Praya's repo was `git init`'d early in the build and files were staged (`git add -A`) once, but **no commits have been made** across this entire build. A new developer will find either an empty history or one giant uncommitted diff, depending on what's in the working tree when they arrive. Check `git log` and `git status` first thing.
+
+---
+
+## 3. Data model
+
+All tables in `public`, RLS enabled on every one, single migration file: `supabase/migrations/0001_init.sql`. **No Supabase CLI adopted** — schema changes are hand-pasted into Supabase's SQL Editor (the plan recommended adopting the CLI for versioned migrations; this never happened. If you add tables, either keep hand-pasting consistently or set up the CLI properly — don't half-adopt it).
+
+| Table | Purpose | Notable columns / constraints |
+|---|---|---|
+| `profiles` | 1:1 with `auth.users` | `timezone` (critical — "today" is ALWAYS computed from this, never server UTC), `is_admin` (unused — no admin UI built yet), `display_name`. Auto-created via a Postgres trigger (`handle_new_user`) on `auth.users` insert. |
+| `habits` | Recurring commitments | `frequency_type` (`daily`/`weekly`/`custom_days`), `custom_days smallint[]`, `is_important`, `archived_at` (soft delete, never hard-delete), `sort_order` (exists, populated with default `0`, **no reorder UI was ever built** — list order is `created_at`, not `sort_order`). A DB trigger (`enforce_important_habit_limit`) blocks a 4th active important habit at the database level — this can't be bypassed by any write path, UI or API. |
+| `tasks` | One-off, date-specific | `due_date`, `priority` (`low`/`medium`/`high`, nullable), `archived_at`. |
+| `completions` | Single source of truth for "done today" | `item_type` (`habit`/`task`) + `item_id` (polymorphic, no FK) + `completion_date`. **Row existence = complete.** No `is_complete` boolean — toggling off deletes the row. `unique(user_id, item_type, item_id, completion_date)` makes double-completion structurally impossible. |
+| `day_reviews` | End-of-Day Review, one per user per day | `satisfaction_rating` (1–5), `reflection_text`, `day_score` (snapshotted numeric — NOT recomputed live once set, so historical scores can't shift if the formula changes later), `completed_at` (null = not yet reviewed). `unique(user_id, review_date)`. |
+| `day_review_items` | Per-missed-item reason + valid/invalid | Denormalized `user_id` (not just via `day_review_id`) so RLS is a direct check, not a join — this table gets hit hard by anything doing miss-reason analytics. |
+| `veyla_conversations` / `veyla_messages` | Chat history for the AI assistant | **Tables exist, completely unused.** Veyla (Phase 8) was never built. |
+| `api_keys` | Automation API auth | `key_prefix` (plaintext, shown in UI), `key_hash` (SHA-256, unique-indexed — hot lookup path for every automation request), `scopes text[]` (only `read:today` used so far, forward-looking), `revoked_at` (soft-revoke). |
+| `admin_audit_log` | For a future admin surface | RLS enabled with **zero policies** — only the service-role client can touch it. Table exists but nothing writes to it yet; no admin UI exists. |
+
+**Indexes**: `habits(user_id, archived_at)`, `tasks(user_id, due_date)`, `completions(user_id, completion_date)`, `completions(user_id, item_type, item_id)`, `day_review_items(user_id, day_review_id)`, `api_keys(key_hash)` unique.
+
+---
+
+## 4. Auth & the service-role containment rule
+
+Three Supabase client factories, ported from a sibling project (Internship Copilot) with the exact same pattern:
+- `src/lib/supabase/server.ts` — `getSupabaseServer()`, for Server Components / Route Handlers / Server Actions.
+- `src/lib/supabase/client.ts` — `getSupabaseBrowser()`, for Client Components.
+- `src/lib/supabase/service.ts` — `getSupabaseServiceRole()`, **bypasses RLS entirely**.
+
+**Two-layer route protection** — both required, neither removable:
+1. `src/lib/supabase/middleware.ts` (`PROTECTED_PREFIXES` array) → redirect UX, runs via `src/proxy.ts`.
+2. `(app)/layout.tsx` → server-side `getUser()` check, defense-in-depth.
+
+Protected prefixes currently: `/today /habits /tasks /analytics /dashboard /review /profile /admin`. `/admin` is in the list but there's no `(admin)` route group behind it yet — it would just redirect to login like everything else, no `is_admin` gate exists in code.
+
+`/api/v1/*` is deliberately **excluded** from the proxy matcher — it authenticates via Bearer token, not session cookie, so running the session-check middleware on it is wasted work.
+
+**Service-role usage is restricted to exactly two files, on purpose:**
+- `src/lib/automation/queries.ts` — every function takes `userId` as its mandatory first parameter and every query filters explicitly on it. This is the whole safety model for the automation API (external requests have no session for RLS to key off).
+- `src/lib/automation/auth.ts` — the `api_keys` hash lookup itself has no user to scope by (it's *resolving* identity).
+
+If you ever see `getSupabaseServiceRole()` imported anywhere else, that's a bug — RLS + the anon client is the correct pattern for anything with a session.
+
+Magic-link flow: `src/app/login/page.tsx` + `actions.ts` (calls `signInWithOtp`) → `src/app/auth/callback/route.ts` (exchanges code) → redirect to `/today`. `src/app/logout/route.ts` clears session only, never touches data.
+
+---
+
+## 5. Core app logic — the parts that matter most
+
+### Completion system (the thing the old app got wrong)
+`src/lib/completions-actions.ts` → `toggleCompletion(itemType, itemId, date)`. **This is the only write path for completion state.** Today, Habits, and Tasks tabs all call this exact function. Because it's one code path with a DB-enforced unique constraint, the three surfaces cannot diverge — this was the original app's worst bug and the whole reason this function is centralized instead of reimplemented per screen.
+
+### Timezone handling
+`src/lib/today.ts` → `getTodayInTimezone(tz)` returns `YYYY-MM-DD` computed in the user's stored timezone via `Intl.DateTimeFormat('en-CA', {timeZone: tz})`. Timezone is captured client-side on first login (`TimezoneSync.tsx` detects `Intl.DateTimeFormat().resolvedOptions().timeZone` and calls a server action) and re-synced on every protected page load. **Never use server UTC for "today" anywhere** — this was flagged from the start as the way to avoid reintroducing the day-rollover version of the completion bug.
+
+### Day score
+`src/lib/day-score.ts` → `computeDayScore()`. Formula: 70% completion rate + 20% important-habit consistency + 10% satisfaction (satisfaction is `null`/excluded until a review is submitted). **One function, three consumers**: Today's live partial score, `/api/v1/day-score`, and the snapshot written to `day_reviews.day_score` at review submission. The snapshot is never recomputed after the fact — `/api/v1/day-score` returns the literal DB value once a review exists (`is_final: true`), and a live computation otherwise (`is_final: false`).
+
+### Habit scheduling — KNOWN INCOMPLETE
+`src/lib/habits.ts` → `isHabitScheduledOn()`. `daily` and `custom_days` are correctly implemented. **`weekly` currently just returns `true` every day** — there's a `ponytail:` comment flagging this explicitly as a placeholder. Nobody has defined what "weekly" should actually mean (once a week on a specific day? a weekly completion count target?). This is the single most important open product decision — see §9.
+
+---
+
+## 6. Route map & what's built vs. stubbed
+
+| Route | Status |
+|---|---|
+| `/` | Public landing, links to `/login`. |
+| `/login`, `/auth/callback`, `/logout` | Fully built, tested end-to-end with a real magic-link click. |
+| `(app)/today` | **Fully built.** Greeting, date, live progress meter, Habits/Tasks cards with working check/uncheck, "Reflect on today" CTA (or "Day closed" chip once reviewed). |
+| `(app)/habits` | **Fully built.** Card grid, create/edit/archive/restore, frequency picker incl. custom-days toggle, max-3-important enforcement (client hint + DB trigger backstop), check/uncheck wired to the same shared action as Today. |
+| `(app)/tasks` | **Fully built.** Today/Upcoming sections, "Show past tasks" toggle (past hidden by default, never affects score), create/edit/delete, priority chips, check/uncheck wired the same way. |
+| `(app)/review` | **Fully built.** Per-missed-item reason + valid/invalid, 1–5 satisfaction picker, reflection textarea, submits via `submitReview` server action, snapshots the score. Editable same-day (re-submit overwrites). |
+| `(app)/analytics` | **Placeholder-ish.** 14-day completions bar chart + 3 stat tiles (total completions, active days, best day), all from real data. Does NOT yet have the invalid-miss-count, per-habit consistency, or streak metrics the original plan called for — those depend partly on the weekly-habit decision in §9. |
+| `(app)/dashboard` | **Built, added mid-session at user request as the 5th nav tab.** Stat tiles (today's completion %, active habits, tasks today, important-habits x/3) + a 7-day bar chart + a reflection-preview slot. **Overlaps conceptually with Analytics** — the two were never explicitly reconciled against the original plan's separate definitions. Worth a product decision on whether to merge or clearly differentiate them. |
+| `(app)/profile` | **Built.** Account info (email/name/timezone), **Reflections PDF export** (see below), API key management (create/revoke, one-time raw-key reveal), sign out. |
+| `(admin)/*` | **Not built at all.** `is_admin` column and `admin_audit_log` table exist; no route group, no gating, no UI. |
+| `/api/v1/today`, `/day-score`, `/habits`, `/tasks` | **Fully built and tested end-to-end**, including a real n8n HTTP Request node hitting it through Docker (`host.docker.internal`). Bearer auth, read-only, path-versioned. |
+
+### Reflections PDF export
+`src/app/(app)/profile/ReflectionsExport.tsx` — client-side PDF generation via `jspdf` (lazy-imported so it doesn't bloat the initial bundle), deliberately client-side to avoid the exact Vercel-serverless-bundle class of problem that bit a sibling project's PDF *parsing* code. Pulls every completed `day_reviews` row up through today plus their `day_review_items`, joined against habit/task titles (orphaned items — parent habit/task later deleted — are silently skipped, not shown as blank).
+
+**Note**: this is narrower than what the original plan specified for data export. The plan's "My Profile & data management" section calls for a **mandatory PDF export gating a full account Reset/Start Fresh flow** (wipe habits/tasks/completions/reviews/etc., keep the account). That Reset flow — and a general JSON export of *all* data, not just reflections — **was never built**. Only this reflections-specific PDF exists.
+
+---
+
+## 7. Every real bug hit during this build (and the fix)
+
+1. **npm package naming** — `create-next-app` rejects capital letters in the project name. Folder is `praya` not `Praya`. Cosmetic, Windows path resolution is case-insensitive anyway.
+2. **Font variable naming mismatch** — `create-next-app`'s scaffolded `layout.tsx` named the Geist font CSS variable `--font-geist-sans`, but shadcn's `base-nova` theme template expected `--font-sans`. Silently fell back to Times New Roman. Fixed by renaming at the source (`layout.tsx`), not patching around it in `globals.css`.
+3. **Base UI's `Button` doesn't support `asChild`** (that's a Radix pattern). It uses a `render` prop instead, and needs `nativeButton={false}` explicitly set when the rendered element isn't a real `<button>` (e.g. `<Button render={<Link href="/login" />} nativeButton={false}>`). Two separate console errors, both real, both fixed.
+4. **Dev-server module-resolution caching** — installing `@supabase/ssr` via npm *while the dev server was already running* left it permanently reporting "module not found" until a full server **restart** (a browser reload alone doesn't re-trigger Turbopack's dependency graph for packages that didn't exist at boot).
+5. **Preview-tool launch config scoping** — the preview tool reads `.claude/launch.json` from the Claude Code *session's root directory*, not from an arbitrary project folder. Early on this caused the preview tool to silently launch the wrong app (Internship Copilot's dev server) when asked to preview Praya. Fixed by adding a `praya-dev` config to the session root's own `launch.json`, using `npm --prefix <path-to-praya>` to target the right directory, on port 3001 (Internship Copilot uses 3000).
+6. **Sandboxed preview browser cannot hold a real Supabase session** — confirmed repeatedly: cross-origin PKCE code exchange silently fails in the automated browser, magic-link tokens are single-use so any replay/retry fails by design, and cookie propagation across a cross-origin redirect chain doesn't behave the same as a real browser. This is a **testing-infrastructure limitation, not an app bug** — verification for authed screens relied on TypeScript, direct DOM/accessibility-tree inspection, curl against real endpoints with service-role-seeded data, and the user's own browser for actual interaction testing.
+7. **Supabase JS query builders are thenables, not native Promises** — `void supabase.from('api_keys').update(...)` does **not** execute the query. Silent no-op. Caught because `last_used_at` wasn't updating on API key use. Fixed with `.then(() => {}, () => {})` to actually trigger execution as fire-and-forget.
+8. **A real TypeScript bug the dev server hid** — `TaskForm.tsx`'s local `priority` state type allowed `null`, but the server action's input type didn't. Compiled fine under Turbopack dev, would have hard-failed `next build`. This is exactly the dev/prod gap the project's `CLAUDE.md` warns about — **always run a full typecheck (or `npm run build`) before trusting a change, dev server output is not sufficient proof.**
+9. **Stale Turbopack module-cache false alarm** — after a refactor, the dev server kept reporting a duplicate `CheckToggle` definition that didn't exist on disk (confirmed via direct file read + `tsc --noEmit` passing clean). Root cause: Turbopack's cache from mid-edit, unrelated to the file that was actually being previewed. Resolved by restarting the dev server.
+10. **n8n + Docker Desktop networking** — `localhost` inside a Docker container refers to the container itself, not the Windows host. n8n running via Docker Desktop couldn't reach `localhost:3001`; fixed by using Docker's special hostname `host.docker.internal:3001` instead.
+11. **Dev server dies between Claude Code sessions** — recurred multiple times ("my app isn't opening"). The local dev server is only alive while explicitly started within an active tool session; it doesn't persist independently. Not a Praya bug — the actual fix is deploying to Vercel (§8), which hasn't happened yet.
+
+---
+
+## 8. Deployment — the biggest gap
+
+**Nothing has been deployed to Vercel.** Every single test in this entire build — including the n8n integration — ran against `localhost:3001` plus the real (already-provisioned) Supabase project. This means:
+- The dev-server-keeps-dying problem (bug #11 above) will keep recurring until this is fixed.
+- Real users cannot use the app at all right now.
+- `GEMINI_API_KEY`, `NEXT_PUBLIC_SITE_URL` / `VERCEL_URL` handling (`src/lib/site-url.ts` already exists and is used by the login flow), and Supabase's redirect-URL allowlist for a production domain have never been exercised.
+
+Next concrete step for a new developer: create a Vercel project pointed at this repo, set the three Supabase env vars + (once Veyla exists) `GEMINI_API_KEY`, add the prod URL to Supabase's Auth → URL Configuration redirect allowlist, deploy, and re-run the magic-link flow against the real domain before assuming anything works.
+
+---
+
+## 9. Open product decisions — genuinely unresolved, need a call
+
+1. **What does "weekly" habit frequency actually mean?** Currently displays as daily (placeholder, flagged in code). Blocks real Analytics work.
+2. **Same-day review edit vs. permanent lock.** Currently editable same-day (upsert + item replace). Never explicitly confirmed with the user — the original plan raised this as an open question and it defaulted to "editable" without a decision being made.
+3. **Analytics vs. Dashboard overlap.** Two screens now show similar completion-trend content. Never reconciled against the plan's original separate definitions (Analytics = deep per-habit/streak/invalid-miss metrics; Dashboard = at-a-glance overview). Worth explicitly deciding what's unique to each.
+4. **Reset/Start Fresh + full JSON export** — specified in detail in the plan (mandatory PDF-before-wipe), not built. Only the narrower Reflections-only PDF export exists.
+5. **Habit reordering** — `sort_order` column exists and is dormant. No drag-and-drop UI. List order is currently `created_at`.
+6. **Rate limiting on `/api/v1/*`** — deliberately deferred per plan. `@upstash/ratelimit` is the noted drop-in if abuse ever shows up. Not urgent pre-launch given expected traffic.
+7. **Admin surface** — entirely unbuilt. `is_admin` currently has no way to be set except raw SQL, and no code checks it anywhere.
+
+---
+
+## 10. What's next per the original plan (unbuilt phases)
+
+- **Phase 7: Analytics** — real completion rate, important-habit consistency, invalid-miss-count, streaks, weekly/monthly trends. Blocked partly on the weekly-habit decision (§9.1).
+- **Phase 8: Veyla** — the AI assistant. Nothing exists yet beyond a placeholder FAB button and two empty DB tables. Needs: Gemini integration (mirror the sibling project's `src/lib/gemini.ts` singleton pattern — `@google/genai`, not `@google/generative-ai`), a static app-knowledge doc for grounding, a live user-data snapshot (can likely reuse `src/lib/automation/queries.ts`'s functions), and explicit "say I'm not sure" prompt discipline so it never hallucinates features.
+- **Phase 9: Admin surface** — `(admin)` route group, `is_admin` gating, audit log writes, minimal usage stats + per-user lookup.
+- **Phase 10 (partial): Reset/Start Fresh + full JSON export** — see §9.4.
+- **Deployment** — see §8, arguably should happen before any of the above.
