@@ -3,7 +3,11 @@
 # Praya
 
 Multi-tenant habit + daily-task app. Next.js 16 (App Router, Turbopack) + Supabase + Vercel + Gemini API.
-Reference plan: `~/.claude/plans/okay-this-sounds-right-hidden-dragonfly.md`.
+Reference plan: `~/.claude/plans/okay-this-sounds-right-hidden-dragonfly.md` (copy this into `docs/original-plan.md` if it isn't there yet — it's currently local-machine-only).
+Full build history, every bug hit, and open product decisions: `HANDOFF.md` (read on demand, not auto-loaded).
+
+## Before starting any task
+Run `git log` and `git status` first. Don't assume a clean tree. Commit when a feature or fix is done — don't let uncommitted work pile up across sessions again.
 
 ## Rules that are load-bearing
 
@@ -27,6 +31,23 @@ If you're tempted to use `getSupabaseServiceRole()` anywhere else, you're probab
 
 **Always run `npm run build` before `git push`.** Turbopack dev is lenient about type narrowing that `next build` rejects. When prod looks stale, that's usually why — Vercel silently keeps the previous deploy.
 
+**Base UI, not Radix.** `@base-ui/react`'s `Button` uses a `render` prop for polymorphism, not `asChild`. Pass `nativeButton={false}` when rendering it as a non-`<button>` element (e.g. `<Button render={<Link href="/login" />} nativeButton={false}>`), or it throws a console warning.
+
+**Dev server doesn't persist between sessions.** "My app isn't opening" almost always means the dev server needs restarting, not a real bug — it's only alive while explicitly started in an active session. Real fix is deploying to Vercel (not done yet, see Status below).
+
+**Turbopack can show stale/phantom errors after a refactor** (duplicate definitions that don't exist on disk, module-not-found after installing a package mid-session). Confirm with `tsc --noEmit` or a direct file read before trusting it — if confirmed stale, restart the dev server rather than debugging code that's already correct.
+
+**n8n in Docker can't reach `localhost`.** Use `host.docker.internal:<port>` instead — `localhost` inside the container refers to the container itself.
+
+**Important-habit limit is enforced at the DB level**, not just in the UI — a trigger (`enforce_important_habit_limit`) blocks a 4th active important habit. Don't try to work around it in application code.
+
+## Current status (check before assuming something exists)
+
+- **Built and tested end-to-end:** auth, Habits/Tasks CRUD + shared completions, End-of-Day Review + score snapshotting, automation API (4 endpoints), Reflections PDF export.
+- **Not built:** Veyla (zero Gemini integration — placeholder UI + empty tables only), Admin surface, full Reset/Start-Fresh + JSON export, habit drag-reorder (`sort_order` column exists but is dormant; list order is `created_at`).
+- **Not deployed.** Nothing has run against anything but `localhost:3001` + the real Supabase project. `GEMINI_API_KEY`, prod `NEXT_PUBLIC_SITE_URL`/`VERCEL_URL` handling, and Supabase's redirect allowlist have never been exercised.
+- **"Weekly" habit frequency is a placeholder** that currently displays as daily — resolve this before building real Analytics on top of it.
+
 ## Stack cheatsheet
 
 - `src/lib/supabase/server.ts` — `getSupabaseServer()` for Server Components, Route Handlers, Server Actions
@@ -35,3 +56,6 @@ If you're tempted to use `getSupabaseServiceRole()` anywhere else, you're probab
 - `src/lib/supabase/service.ts` — service-role, restricted use (see above)
 - Migrations live in `supabase/migrations/`, applied by pasting into Supabase SQL Editor
 - Storage buckets: none currently. If you add one, keep it private + `<user_id>/*` path convention
+
+## Compact instructions
+When compacting, preserve: the specific task/bug currently being worked on, code changes made this session, and file paths touched. Drop general exploration and superseded plans.
