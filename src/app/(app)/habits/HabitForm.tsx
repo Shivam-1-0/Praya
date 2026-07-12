@@ -14,6 +14,7 @@ export type Habit = {
   description: string | null;
   frequency_type: "daily" | "weekly" | "custom_days";
   custom_days: number[] | null;
+  target_count: number;
   is_important: boolean;
 };
 
@@ -34,6 +35,7 @@ export function HabitForm({
     habit?.frequency_type ?? "daily",
   );
   const [customDays, setCustomDays] = useState<number[]>(habit?.custom_days ?? []);
+  const [targetCount, setTargetCount] = useState<number>(habit?.target_count ?? 1);
   const [isImportant, setIsImportant] = useState(habit?.is_important ?? false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export function HabitForm({
     setSubmitting(true);
     setError(null);
 
-    const input = { title, description, frequencyType, customDays, isImportant };
+    const input = { title, description, frequencyType, customDays, targetCount, isImportant };
     const result = habit ? await updateHabit(habit.id, input) : await createHabit(input);
 
     setSubmitting(false);
@@ -101,6 +103,24 @@ export function HabitForm({
           <option value="custom_days">Custom days</option>
         </select>
       </div>
+
+      {frequencyType === "weekly" ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="habit-target-count">Times per week</Label>
+          <Input
+            id="habit-target-count"
+            type="number"
+            min={1}
+            max={7}
+            value={targetCount}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n)) setTargetCount(Math.min(7, Math.max(1, Math.floor(n))));
+            }}
+            className="w-24"
+          />
+        </div>
+      ) : null}
 
       {frequencyType === "custom_days" ? (
         <div className="space-y-1.5">

@@ -1,5 +1,5 @@
 import { getSupabaseServiceRole } from "@/lib/supabase/service";
-import { getTodayInTimezone } from "@/lib/today";
+import { getTodayInTimezone, getWeekStart } from "@/lib/today";
 import { isHabitScheduledOn } from "@/lib/habits";
 import { computeDayScore } from "@/lib/day-score";
 
@@ -24,6 +24,7 @@ type HabitRow = {
   description: string | null;
   frequency_type: "daily" | "weekly" | "custom_days";
   custom_days: number[] | null;
+  target_count: number;
   is_important: boolean;
   archived_at: string | null;
 };
@@ -41,10 +42,11 @@ export async function getTodaySnapshot(userId: string) {
   const supabase = getSupabaseServiceRole();
   const tz = await getTimezone(userId);
   const today = getTodayInTimezone(tz);
+  const weekStart = getWeekStart(today);
 
   const { data: habitsRaw } = await supabase
     .from("habits")
-    .select("id, title, description, frequency_type, custom_days, is_important")
+    .select("id, title, description, frequency_type, custom_days, target_count, is_important")
     .eq("user_id", userId)
     .is("archived_at", null);
 
@@ -55,16 +57,26 @@ export async function getTodaySnapshot(userId: string) {
     .is("archived_at", null)
     .eq("due_date", today);
 
-  const { data: comps } = await supabase
+  const { data: weekComps } = await supabase
     .from("completions")
-    .select("item_type, item_id")
+    .select("item_type, item_id, completion_date")
     .eq("user_id", userId)
-    .eq("completion_date", today);
+    .gte("completion_date", weekStart)
+    .lte("completion_date", today);
 
-  const done = new Set((comps ?? []).map((c) => `${c.item_type}:${c.item_id}`));
+  const done = new Set(
+    (weekComps ?? [])
+      .filter((c) => c.completion_date === today)
+      .map((c) => `${c.item_type}:${c.item_id}`),
+  );
+  const weekHabitCounts = new Map<string, number>();
+  for (const c of weekComps ?? []) {
+    if (c.item_type !== "habit") continue;
+    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+  }
 
   const habits = (habitsRaw ?? [])
-    .filter((h) => isHabitScheduledOn(h, today))
+    .filter((h) => isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0))
     .map((h) => ({
       id: h.id,
       title: h.title,
@@ -135,7 +147,7 @@ export async function listHabits(userId: string, archived: boolean | null) {
   const supabase = getSupabaseServiceRole();
   let q = supabase
     .from("habits")
-    .select("id, title, description, frequency_type, custom_days, is_important, archived_at, created_at")
+    .select("id, title, description, frequency_type, custom_days, target_count, is_important, archived_at, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (archived === false) q = q.is("archived_at", null);

@@ -1,5 +1,5 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getTodayInTimezone } from "@/lib/today";
+import { getTodayInTimezone, getWeekStart } from "@/lib/today";
 import { isHabitScheduledOn } from "@/lib/habits";
 import { getGreeting, formatTodayLong, formatWeekday } from "@/lib/greeting";
 import { TodayClient } from "./TodayClient";
@@ -19,9 +19,11 @@ export default async function TodayPage() {
   const tz = profile?.timezone ?? "UTC";
   const today = getTodayInTimezone(tz);
 
+  const weekStart = getWeekStart(today);
+
   const { data: habitsRaw } = await supabase
     .from("habits")
-    .select("id, title, frequency_type, custom_days, is_important")
+    .select("id, title, frequency_type, custom_days, target_count, is_important")
     .eq("user_id", user!.id)
     .is("archived_at", null)
     .order("sort_order", { ascending: true })
@@ -35,12 +37,13 @@ export default async function TodayPage() {
     .eq("due_date", today)
     .order("created_at", { ascending: true });
 
-  const [{ data: comps }, { data: review }] = await Promise.all([
+  const [{ data: weekComps }, { data: review }] = await Promise.all([
     supabase
       .from("completions")
-      .select("item_type, item_id")
+      .select("item_type, item_id, completion_date")
       .eq("user_id", user!.id)
-      .eq("completion_date", today),
+      .gte("completion_date", weekStart)
+      .lte("completion_date", today),
     supabase
       .from("day_reviews")
       .select("day_score, completed_at")
@@ -49,10 +52,19 @@ export default async function TodayPage() {
       .maybeSingle(),
   ]);
 
-  const doneSet = new Set((comps ?? []).map((c) => `${c.item_type}:${c.item_id}`));
+  const doneSet = new Set(
+    (weekComps ?? [])
+      .filter((c) => c.completion_date === today)
+      .map((c) => `${c.item_type}:${c.item_id}`),
+  );
+  const weekHabitCounts = new Map<string, number>();
+  for (const c of weekComps ?? []) {
+    if (c.item_type !== "habit") continue;
+    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+  }
 
   const habits = (habitsRaw ?? [])
-    .filter((h) => isHabitScheduledOn(h, today))
+    .filter((h) => isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0))
     .map((h) => ({
       id: h.id,
       title: h.title,

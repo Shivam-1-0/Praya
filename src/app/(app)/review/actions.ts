@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getTodayInTimezone } from "@/lib/today";
+import { getTodayInTimezone, getWeekStart } from "@/lib/today";
 import { isHabitScheduledOn } from "@/lib/habits";
 import { computeDayScore } from "@/lib/day-score";
 
@@ -40,12 +40,13 @@ export async function submitReview(input: SubmitReviewInput) {
     .eq("user_id", user.id)
     .single();
   const today = getTodayInTimezone(profile?.timezone ?? "UTC");
+  const weekStart = getWeekStart(today);
 
   // Fresh count of today's items + completions to snapshot the score against.
-  const [{ data: habits }, { data: tasks }, { data: comps }] = await Promise.all([
+  const [{ data: habits }, { data: tasks }, { data: weekComps }] = await Promise.all([
     supabase
       .from("habits")
-      .select("id, frequency_type, custom_days, is_important")
+      .select("id, frequency_type, custom_days, target_count, is_important")
       .eq("user_id", user.id)
       .is("archived_at", null),
     supabase
@@ -56,13 +57,25 @@ export async function submitReview(input: SubmitReviewInput) {
       .eq("due_date", today),
     supabase
       .from("completions")
-      .select("item_type, item_id")
+      .select("item_type, item_id, completion_date")
       .eq("user_id", user.id)
-      .eq("completion_date", today),
+      .gte("completion_date", weekStart)
+      .lte("completion_date", today),
   ]);
 
-  const done = new Set((comps ?? []).map((c) => `${c.item_type}:${c.item_id}`));
-  const scheduledHabits = (habits ?? []).filter((h) => isHabitScheduledOn(h, today));
+  const done = new Set(
+    (weekComps ?? [])
+      .filter((c) => c.completion_date === today)
+      .map((c) => `${c.item_type}:${c.item_id}`),
+  );
+  const weekHabitCounts = new Map<string, number>();
+  for (const c of weekComps ?? []) {
+    if (c.item_type !== "habit") continue;
+    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+  }
+  const scheduledHabits = (habits ?? []).filter((h) =>
+    isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0),
+  );
   const totalItems = scheduledHabits.length + (tasks?.length ?? 0);
   const completedItems =
     scheduledHabits.filter((h) => done.has(`habit:${h.id}`)).length +

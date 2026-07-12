@@ -10,8 +10,16 @@ type HabitInput = {
   description: string;
   frequencyType: "daily" | "weekly" | "custom_days";
   customDays: number[];
+  targetCount: number;
   isImportant: boolean;
 };
+
+function normalizeTargetCount(frequencyType: HabitInput["frequencyType"], raw: number): number {
+  if (frequencyType !== "weekly") return 1;
+  const n = Math.floor(raw);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(7, Math.max(1, n));
+}
 
 function importantLimitError(message: string) {
   return message.includes("Cannot have more than 3 active important habits")
@@ -35,6 +43,7 @@ export async function createHabit(input: HabitInput): Promise<ActionResult> {
     description: input.description.trim() || null,
     frequency_type: input.frequencyType,
     custom_days: input.frequencyType === "custom_days" ? input.customDays : null,
+    target_count: normalizeTargetCount(input.frequencyType, input.targetCount),
     is_important: input.isImportant,
   });
 
@@ -61,6 +70,7 @@ export async function updateHabit(id: string, input: HabitInput): Promise<Action
       description: input.description.trim() || null,
       frequency_type: input.frequencyType,
       custom_days: input.frequencyType === "custom_days" ? input.customDays : null,
+      target_count: normalizeTargetCount(input.frequencyType, input.targetCount),
       is_important: input.isImportant,
     })
     .eq("id", id)

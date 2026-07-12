@@ -1,5 +1,5 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getTodayInTimezone, lastNDates } from "@/lib/today";
+import { getTodayInTimezone, getWeekStart, lastNDates } from "@/lib/today";
 import { isHabitScheduledOn } from "@/lib/habits";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -19,9 +19,11 @@ export default async function DashboardPage() {
   const today = getTodayInTimezone(tz);
   const week = lastNDates(today, 7);
 
+  const weekStart = getWeekStart(today);
+
   const { data: habits } = await supabase
     .from("habits")
-    .select("id, frequency_type, custom_days, is_important")
+    .select("id, frequency_type, custom_days, target_count, is_important")
     .eq("user_id", user!.id)
     .is("archived_at", null);
 
@@ -34,12 +36,21 @@ export default async function DashboardPage() {
 
   const { data: compsWeek } = await supabase
     .from("completions")
-    .select("completion_date")
+    .select("item_type, item_id, completion_date")
     .eq("user_id", user!.id)
     .gte("completion_date", week[0]);
 
+  const weekHabitCounts = new Map<string, number>();
+  for (const c of compsWeek ?? []) {
+    if (c.item_type !== "habit") continue;
+    if (c.completion_date < weekStart) continue;
+    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+  }
+
   const activeHabits = habits ?? [];
-  const scheduledToday = activeHabits.filter((h) => isHabitScheduledOn(h, today));
+  const scheduledToday = activeHabits.filter((h) =>
+    isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0),
+  );
   const importantCount = activeHabits.filter((h) => h.is_important).length;
   const taskCount = (tasksToday ?? []).length;
 

@@ -19,7 +19,7 @@ export default async function HabitsPage() {
 
   const { data: habits } = await supabase
     .from("habits")
-    .select("id, title, description, frequency_type, custom_days, is_important, archived_at")
+    .select("id, title, description, frequency_type, custom_days, target_count, is_important, archived_at")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: true });
 
