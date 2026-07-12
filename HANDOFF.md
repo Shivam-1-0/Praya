@@ -90,8 +90,10 @@ Magic-link flow: `src/app/login/page.tsx` + `actions.ts` (calls `signInWithOtp`)
 ### Day score
 `src/lib/day-score.ts` → `computeDayScore()`. Formula: 70% completion rate + 20% important-habit consistency + 10% satisfaction (satisfaction is `null`/excluded until a review is submitted). **One function, three consumers**: Today's live partial score, `/api/v1/day-score`, and the snapshot written to `day_reviews.day_score` at review submission. The snapshot is never recomputed after the fact — `/api/v1/day-score` returns the literal DB value once a review exists (`is_final: true`), and a live computation otherwise (`is_final: false`).
 
-### Habit scheduling — KNOWN INCOMPLETE
-`src/lib/habits.ts` → `isHabitScheduledOn()`. `daily` and `custom_days` are correctly implemented. **`weekly` currently just returns `true` every day** — there's a `ponytail:` comment flagging this explicitly as a placeholder. Nobody has defined what "weekly" should actually mean (once a week on a specific day? a weekly completion count target?). This is the single most important open product decision — see §9.
+### Habit scheduling
+`src/lib/habits.ts` exports two related functions with distinct roles — don't collapse them.
+- `isHabitScheduledOn()` drives **visibility** (Today's card list). For `weekly`, it returns true until the ISO-week completion count hits `target_count`, so users can proactively check the habit off any day of the week.
+- `countsTowardDayScore()` drives the **day-score denominator** (Dashboard, Review's missed list + score snapshot, `/api/v1/day-score`, `/api/v1/today` summary). For `weekly`, it uses the deferral-until-out-of-runway model — see §9.1.
 
 ---
 
@@ -147,7 +149,21 @@ Next concrete step for a new developer: create a Vercel project pointed at this 
 
 ## 9. Open product decisions — genuinely unresolved, need a call
 
-1. **What does "weekly" habit frequency actually mean?** Currently displays as daily (placeholder, flagged in code). Blocks real Analytics work.
+1. **Weekly habit semantics — RESOLVED.** Two commits:
+   - `8a61335` defined weekly as an **N-per-week quota** (`habits.target_count`, 1–7, default 1). `isHabitScheduledOn()` returns false once the ISO-week completion count hits the target, so completed weekly habits drop off Today's card list, Review's missed list, Dashboard's visible items, and the automation snapshot's `habits[]`.
+   - Follow-up commit resolved the two gaps left open by 8a61335:
+     - **Per-day score denominator** no longer overcounts a weekly habit across every day it's still "due" before quota is hit. Introduced `countsTowardDayScore()` in `src/lib/habits.ts` and swapped all four denominator sites (Dashboard, Review's snapshot action, Review's missed-list filter, `getTodaySnapshot`/`getDayScore` in the automation layer).
+     - **Review UI** now distinguishes "already hit weekly target" from "archived" via a "This week's wins" chip strip in `ReviewClient` — archived habits stay silently excluded (SQL filter), quota-met weekly habits get a positive callout.
+
+   **Design decision — deferral-until-out-of-runway model.** A weekly habit contributes to today's day-score denominator only if:
+   - it was completed today (1/1), OR
+   - it wasn't completed today AND `days_left_in_week_including_today <= target_remaining_before_today` (0/1 — the runway has closed).
+
+   Otherwise it contributes 0/0 — the day still has time to absorb the quota, so a skip today isn't a miss yet.
+
+   **Observable consequence:** an ignored 3×/week habit produces **no score drag** on Mon–Thu; the first miss lands Friday (3 days left = 3 needed), followed by Sat and Sun. Net effect over a fully-untouched week: exactly 3 misses in the denominator, matching the quota. This is intentional — deferral is legal in a weekly quota, and the score should reflect that. If a future product call wants heavier accountability (score drag from day 1), the alternative is fractional weighting (`target/7` per day); the swap point is a single function, `countsTowardDayScore()`.
+
+   Runnable check for the math: `npx tsx src/lib/habits.check.ts`.
 2. **Same-day review edit vs. permanent lock.** Currently editable same-day (upsert + item replace). Never explicitly confirmed with the user — the original plan raised this as an open question and it defaulted to "editable" without a decision being made.
 3. **Analytics vs. Dashboard overlap.** Two screens now show similar completion-trend content. Never reconciled against the plan's original separate definitions (Analytics = deep per-habit/streak/invalid-miss metrics; Dashboard = at-a-glance overview). Worth explicitly deciding what's unique to each.
 4. **Reset/Start Fresh + full JSON export** — specified in detail in the plan (mandatory PDF-before-wipe), not built. Only the narrower Reflections-only PDF export exists.
@@ -159,7 +175,7 @@ Next concrete step for a new developer: create a Vercel project pointed at this 
 
 ## 10. What's next per the original plan (unbuilt phases)
 
-- **Phase 7: Analytics** — real completion rate, important-habit consistency, invalid-miss-count, streaks, weekly/monthly trends. Blocked partly on the weekly-habit decision (§9.1).
+- **Phase 7: Analytics** — real completion rate, important-habit consistency, invalid-miss-count, streaks, weekly/monthly trends. Weekly-habit semantics are now settled (see §9.1); this is unblocked.
 - **Phase 8: Veyla** — the AI assistant. Nothing exists yet beyond a placeholder FAB button and two empty DB tables. Needs: Gemini integration (mirror the sibling project's `src/lib/gemini.ts` singleton pattern — `@google/genai`, not `@google/generative-ai`), a static app-knowledge doc for grounding, a live user-data snapshot (can likely reuse `src/lib/automation/queries.ts`'s functions), and explicit "say I'm not sure" prompt discipline so it never hallucinates features.
 - **Phase 9: Admin surface** — `(admin)` route group, `is_admin` gating, audit log writes, minimal usage stats + per-user lookup.
 - **Phase 10 (partial): Reset/Start Fresh + full JSON export** — see §9.4.

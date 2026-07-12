@@ -35,3 +35,46 @@ export function isHabitScheduledOn(
   const weekday = new Date(`${dateStr}T12:00:00Z`).getUTCDay();
   return (habit.custom_days ?? []).includes(weekday);
 }
+
+// Does this habit contribute to today's day-score, and if so as done or missed?
+// Deferral-until-out-of-runway: a weekly habit only counts today when it was
+// done today OR the remaining days in the week can no longer absorb the quota.
+// See HANDOFF.md §9.1 for the design decision.
+export type DayScoreContribution = "complete" | "missed" | "not_counted";
+
+export function countsTowardDayScore(
+  habit: HabitSchedule,
+  dateStr: string,
+  weekCountBeforeToday: number,
+  wasCompletedToday: boolean,
+  weekEndDate: string,
+): DayScoreContribution {
+  if (habit.frequency_type === "daily") {
+    return wasCompletedToday ? "complete" : "missed";
+  }
+  if (habit.frequency_type === "custom_days") {
+    const weekday = new Date(`${dateStr}T12:00:00Z`).getUTCDay();
+    if (!(habit.custom_days ?? []).includes(weekday)) return "not_counted";
+    return wasCompletedToday ? "complete" : "missed";
+  }
+  // weekly
+  if (wasCompletedToday) return "complete";
+  const remainingQuota = habit.target_count - weekCountBeforeToday;
+  if (remainingQuota <= 0) return "not_counted";
+  const daysLeftIncludingToday = daysBetweenInclusive(dateStr, weekEndDate);
+  return daysLeftIncludingToday <= remainingQuota ? "missed" : "not_counted";
+}
+
+function daysBetweenInclusive(fromStr: string, toStr: string): number {
+  const from = Date.UTC(
+    Number(fromStr.slice(0, 4)),
+    Number(fromStr.slice(5, 7)) - 1,
+    Number(fromStr.slice(8, 10)),
+  );
+  const to = Date.UTC(
+    Number(toStr.slice(0, 4)),
+    Number(toStr.slice(5, 7)) - 1,
+    Number(toStr.slice(8, 10)),
+  );
+  return Math.round((to - from) / 86_400_000) + 1;
+}

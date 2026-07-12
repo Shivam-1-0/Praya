@@ -1,6 +1,6 @@
 import { getSupabaseServiceRole } from "@/lib/supabase/service";
-import { getTodayInTimezone, getWeekStart } from "@/lib/today";
-import { isHabitScheduledOn } from "@/lib/habits";
+import { getTodayInTimezone, getWeekStart, getWeekEnd } from "@/lib/today";
+import { isHabitScheduledOn, countsTowardDayScore } from "@/lib/habits";
 import { computeDayScore } from "@/lib/day-score";
 
 // The ONLY module allowed to use the service-role client for user data.
@@ -70,10 +70,15 @@ export async function getTodaySnapshot(userId: string) {
       .map((c) => `${c.item_type}:${c.item_id}`),
   );
   const weekHabitCounts = new Map<string, number>();
+  const habitCountBeforeToday = new Map<string, number>();
   for (const c of weekComps ?? []) {
     if (c.item_type !== "habit") continue;
     weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+    if (c.completion_date < today) {
+      habitCountBeforeToday.set(c.item_id, (habitCountBeforeToday.get(c.item_id) ?? 0) + 1);
+    }
   }
+  const weekEnd = getWeekEnd(today);
 
   const habits = (habitsRaw ?? [])
     .filter((h) => isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0))
@@ -93,7 +98,28 @@ export async function getTodaySnapshot(userId: string) {
     is_complete: done.has(`task:${t.id}`),
   }));
 
-  const importantHabits = habits.filter((h) => h.is_important);
+  // Score denominator uses countsTowardDayScore, not visibility — a weekly
+  // habit still has runway shouldn't sink today's score. See HANDOFF.md §9.1.
+  let habitTotal = 0;
+  let habitCompleted = 0;
+  let importantTotal = 0;
+  let importantCompleted = 0;
+  for (const h of habitsRaw ?? []) {
+    const c = countsTowardDayScore(
+      h,
+      today,
+      habitCountBeforeToday.get(h.id) ?? 0,
+      done.has(`habit:${h.id}`),
+      weekEnd,
+    );
+    if (c === "not_counted") continue;
+    habitTotal += 1;
+    if (c === "complete") habitCompleted += 1;
+    if (h.is_important) {
+      importantTotal += 1;
+      if (c === "complete") importantCompleted += 1;
+    }
+  }
 
   return {
     date: today,
@@ -101,10 +127,10 @@ export async function getTodaySnapshot(userId: string) {
     habits,
     tasks,
     summary: {
-      total_items: habits.length + tasks.length,
-      completed_items: habits.filter((h) => h.is_complete).length + tasks.filter((t) => t.is_complete).length,
-      important_habits_total: importantHabits.length,
-      important_habits_completed: importantHabits.filter((h) => h.is_complete).length,
+      total_items: habitTotal + tasks.length,
+      completed_items: habitCompleted + tasks.filter((t) => t.is_complete).length,
+      important_habits_total: importantTotal,
+      important_habits_completed: importantCompleted,
     },
   };
 }

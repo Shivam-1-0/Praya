@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getTodayInTimezone, getWeekStart } from "@/lib/today";
-import { isHabitScheduledOn } from "@/lib/habits";
+import { getTodayInTimezone, getWeekStart, getWeekEnd } from "@/lib/today";
+import { countsTowardDayScore } from "@/lib/habits";
 import { PageHeader } from "@/components/PageHeader";
-import { ReviewClient, type MissedItem } from "./ReviewClient";
+import { ReviewClient, type MissedItem, type WeeklyWin } from "./ReviewClient";
 
 export default async function ReviewPage() {
   const supabase = await getSupabaseServer();
@@ -52,17 +52,34 @@ export default async function ReviewPage() {
       .filter((c) => c.completion_date === today)
       .map((c) => `${c.item_type}:${c.item_id}`),
   );
-  const weekHabitCounts = new Map<string, number>();
+  const habitCountBeforeToday = new Map<string, number>();
+  const habitCountThroughToday = new Map<string, number>();
   for (const c of weekComps ?? []) {
     if (c.item_type !== "habit") continue;
-    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+    habitCountThroughToday.set(c.item_id, (habitCountThroughToday.get(c.item_id) ?? 0) + 1);
+    if (c.completion_date < today) {
+      habitCountBeforeToday.set(c.item_id, (habitCountBeforeToday.get(c.item_id) ?? 0) + 1);
+    }
   }
+  const weekEnd = getWeekEnd(today);
 
   const missedItems: MissedItem[] = [];
+  const weeklyWins: WeeklyWin[] = [];
   for (const h of habits ?? []) {
-    if (!isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0)) continue;
-    if (done.has(`habit:${h.id}`)) continue;
-    missedItems.push({ item_type: "habit", item_id: h.id, title: h.title });
+    if (h.frequency_type === "weekly" && (habitCountThroughToday.get(h.id) ?? 0) >= h.target_count) {
+      weeklyWins.push({ item_id: h.id, title: h.title, target_count: h.target_count });
+      continue;
+    }
+    const c = countsTowardDayScore(
+      h,
+      today,
+      habitCountBeforeToday.get(h.id) ?? 0,
+      done.has(`habit:${h.id}`),
+      weekEnd,
+    );
+    if (c === "missed") {
+      missedItems.push({ item_type: "habit", item_id: h.id, title: h.title });
+    }
   }
   for (const t of tasks ?? []) {
     if (done.has(`task:${t.id}`)) continue;
@@ -86,6 +103,7 @@ export default async function ReviewPage() {
 
       <ReviewClient
         missedItems={missedItems}
+        weeklyWins={weeklyWins}
         initialSatisfaction={existing?.satisfaction_rating ?? null}
         initialReflection={existing?.reflection_text ?? ""}
       />

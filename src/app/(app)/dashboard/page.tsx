@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getTodayInTimezone, getWeekStart, lastNDates } from "@/lib/today";
-import { isHabitScheduledOn } from "@/lib/habits";
+import { getTodayInTimezone, getWeekStart, getWeekEnd, lastNDates } from "@/lib/today";
+import { countsTowardDayScore } from "@/lib/habits";
 import { PageHeader } from "@/components/PageHeader";
 
 export default async function DashboardPage() {
@@ -40,17 +40,34 @@ export default async function DashboardPage() {
     .eq("user_id", user!.id)
     .gte("completion_date", week[0]);
 
-  const weekHabitCounts = new Map<string, number>();
+  const habitCountBeforeToday = new Map<string, number>();
+  const habitDoneToday = new Set<string>();
   for (const c of compsWeek ?? []) {
     if (c.item_type !== "habit") continue;
     if (c.completion_date < weekStart) continue;
-    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+    if (c.completion_date < today) {
+      habitCountBeforeToday.set(c.item_id, (habitCountBeforeToday.get(c.item_id) ?? 0) + 1);
+    } else if (c.completion_date === today) {
+      habitDoneToday.add(c.item_id);
+    }
   }
 
   const activeHabits = habits ?? [];
-  const scheduledToday = activeHabits.filter((h) =>
-    isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0),
-  );
+  const weekEnd = getWeekEnd(today);
+  let habitTotal = 0;
+  let habitDone = 0;
+  for (const h of activeHabits) {
+    const c = countsTowardDayScore(
+      h,
+      today,
+      habitCountBeforeToday.get(h.id) ?? 0,
+      habitDoneToday.has(h.id),
+      weekEnd,
+    );
+    if (c === "not_counted") continue;
+    habitTotal += 1;
+    if (c === "complete") habitDone += 1;
+  }
   const importantCount = activeHabits.filter((h) => h.is_important).length;
   const taskCount = (tasksToday ?? []).length;
 
@@ -60,8 +77,11 @@ export default async function DashboardPage() {
   }
   const weekCounts = week.map((d) => perDay.get(d) ?? 0);
   const peak = Math.max(1, ...weekCounts);
-  const doneToday = perDay.get(today) ?? 0;
-  const totalToday = scheduledToday.length + taskCount;
+  const taskDoneToday = (compsWeek ?? []).filter(
+    (c) => c.item_type === "task" && c.completion_date === today,
+  ).length;
+  const totalToday = habitTotal + taskCount;
+  const doneToday = habitDone + taskDoneToday;
   const pctToday = totalToday === 0 ? 0 : Math.round((doneToday / totalToday) * 100);
 
   return (

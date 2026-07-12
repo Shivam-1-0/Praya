@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { getTodayInTimezone, getWeekStart } from "@/lib/today";
-import { isHabitScheduledOn } from "@/lib/habits";
+import { getTodayInTimezone, getWeekStart, getWeekEnd } from "@/lib/today";
+import { countsTowardDayScore } from "@/lib/habits";
 import { computeDayScore } from "@/lib/day-score";
 
 type MissedItemInput = {
@@ -68,25 +68,39 @@ export async function submitReview(input: SubmitReviewInput) {
       .filter((c) => c.completion_date === today)
       .map((c) => `${c.item_type}:${c.item_id}`),
   );
-  const weekHabitCounts = new Map<string, number>();
+  const habitCountBeforeToday = new Map<string, number>();
   for (const c of weekComps ?? []) {
     if (c.item_type !== "habit") continue;
-    weekHabitCounts.set(c.item_id, (weekHabitCounts.get(c.item_id) ?? 0) + 1);
+    if (c.completion_date < today) {
+      habitCountBeforeToday.set(c.item_id, (habitCountBeforeToday.get(c.item_id) ?? 0) + 1);
+    }
   }
-  const scheduledHabits = (habits ?? []).filter((h) =>
-    isHabitScheduledOn(h, today, weekHabitCounts.get(h.id) ?? 0),
-  );
-  const totalItems = scheduledHabits.length + (tasks?.length ?? 0);
-  const completedItems =
-    scheduledHabits.filter((h) => done.has(`habit:${h.id}`)).length +
-    (tasks ?? []).filter((t) => done.has(`task:${t.id}`)).length;
-  const importantHabits = scheduledHabits.filter((h) => h.is_important);
-  const importantCompleted = importantHabits.filter((h) => done.has(`habit:${h.id}`)).length;
+  const weekEnd = getWeekEnd(today);
+  let totalItems = tasks?.length ?? 0;
+  let completedItems = (tasks ?? []).filter((t) => done.has(`task:${t.id}`)).length;
+  let importantTotal = 0;
+  let importantCompleted = 0;
+  for (const h of habits ?? []) {
+    const c = countsTowardDayScore(
+      h,
+      today,
+      habitCountBeforeToday.get(h.id) ?? 0,
+      done.has(`habit:${h.id}`),
+      weekEnd,
+    );
+    if (c === "not_counted") continue;
+    totalItems += 1;
+    if (c === "complete") completedItems += 1;
+    if (h.is_important) {
+      importantTotal += 1;
+      if (c === "complete") importantCompleted += 1;
+    }
+  }
 
   const snapshot = computeDayScore({
     totalItems,
     completedItems,
-    importantTotal: importantHabits.length,
+    importantTotal,
     importantCompleted,
     satisfactionRating: input.satisfactionRating,
   });

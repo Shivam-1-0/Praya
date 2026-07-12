@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { CheckCircle2, XCircle, HelpCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { submitReview } from "./actions";
 
@@ -19,14 +19,22 @@ export type MissedItem = {
   title: string;
 };
 
+export type WeeklyWin = {
+  item_id: string;
+  title: string;
+  target_count: number;
+};
+
 type ItemState = { reason: string; isValid: boolean | null };
 
 export function ReviewClient({
   missedItems,
+  weeklyWins,
   initialSatisfaction,
   initialReflection,
 }: {
   missedItems: MissedItem[];
+  weeklyWins: WeeklyWin[];
   initialSatisfaction: number | null;
   initialReflection: string;
 }) {
@@ -79,6 +87,29 @@ export function ReviewClient({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {weeklyWins.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">This week&apos;s wins</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Weekly targets you&apos;ve already met — keep it going.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {weeklyWins.map((w) => (
+              <div
+                key={w.item_id}
+                className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary"
+              >
+                <Trophy size={12} />
+                <span className="font-medium">{w.title}</span>
+                <span className="text-primary/70">· {w.target_count}×/wk</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {missedItems.length > 0 ? (
         <section className="space-y-3">
           <div>
