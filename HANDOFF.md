@@ -136,14 +136,27 @@ Magic-link flow: `src/app/login/page.tsx` + `actions.ts` (calls `signInWithOtp`)
 
 ---
 
-## 8. Deployment — the biggest gap
+## 8. Deployment — DONE
 
-**Nothing has been deployed to Vercel.** Every single test in this entire build — including the n8n integration — ran against `localhost:3001` plus the real (already-provisioned) Supabase project. This means:
-- The dev-server-keeps-dying problem (bug #11 above) will keep recurring until this is fixed.
-- Real users cannot use the app at all right now.
-- `GEMINI_API_KEY`, `NEXT_PUBLIC_SITE_URL` / `VERCEL_URL` handling (`src/lib/site-url.ts` already exists and is used by the login flow), and Supabase's redirect-URL allowlist for a production domain have never been exercised.
+**Live at `https://praya-black.vercel.app`.** GitHub repo: `Shivam-1-0/Praya`, deployed via Vercel's GitHub integration (pushes to `main` auto-deploy). Magic-link auth verified end-to-end against the prod domain.
 
-Next concrete step for a new developer: create a Vercel project pointed at this repo, set the three Supabase env vars + (once Veyla exists) `GEMINI_API_KEY`, add the prod URL to Supabase's Auth → URL Configuration redirect allowlist, deploy, and re-run the magic-link flow against the real domain before assuming anything works.
+Env vars set on Vercel (Production + Preview):
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (Sensitive)
+- `NEXT_PUBLIC_SITE_URL=https://praya-black.vercel.app` — pinned so login redirects use the stable domain, not the per-deploy `VERCEL_URL`. `src/lib/site-url.ts` prefers this env var first.
+
+Supabase Auth → URL Configuration:
+- Site URL: `https://praya-black.vercel.app`
+- Redirect URLs allowlist includes `https://praya-black.vercel.app/auth/callback` and `https://praya-black.vercel.app/**`.
+
+Still-outstanding for future phases:
+- `GEMINI_API_KEY` — not set anywhere yet, add when Phase 8 Veyla lands.
+- Custom domain — currently on the `*.vercel.app` alias only.
+
+Deploy gotchas we hit (documented in case they recur):
+- **Env var names are case- and prefix-sensitive.** Custom-cased names like `Supabase_URL` don't work — the code reads exact `process.env.NEXT_PUBLIC_SUPABASE_URL` etc. Vercel doesn't let you rename an existing var, you have to delete and re-add.
+- **Supabase Site URL controls magic-link redirects.** Leaving it at `localhost:3000` after deploying to prod causes the email link to redirect to localhost. Update it whenever the prod domain changes.
 
 ---
 
