@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ViewTransition } from "react";
 import { User } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { BottomNav, SideNav } from "./AppNav";
@@ -43,7 +44,7 @@ export default async function AppLayout({
           </div>
         </header>
         <main className="mx-auto max-w-md px-5 pt-6 pb-24 md:max-w-4xl md:px-10 md:py-10">
-          {children}
+          <ViewTransition>{children}</ViewTransition>
         </main>
       </div>
       <VeylaFab />
