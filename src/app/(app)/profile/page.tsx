@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { ApiKeysPanel } from "./ApiKeysPanel";
 import { ReflectionsExport, type ReflectionRow } from "./ReflectionsExport";
+import { AccountReset } from "./AccountReset";
 
 export default async function ProfilePage() {
   const supabase = await getSupabaseServer();
@@ -110,6 +111,8 @@ export default async function ProfilePage() {
           Sign out
         </Button>
       </form>
+
+      <AccountReset reflections={reflections} />
     </div>
   );
 }
