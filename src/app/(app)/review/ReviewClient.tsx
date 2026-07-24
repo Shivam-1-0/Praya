@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, XCircle, HelpCircle, Trophy } from "lucide-react";
+import { CheckCircle2, XCircle, HelpCircle, Trophy, Lock, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { submitReview } from "./actions";
+import { isReviewLocked, timeUntilLock, LOCK_HOURS } from "@/lib/review-lock";
 
 const SATISFACTION_OPTIONS = [
   { value: 1, label: "Wasted" },
@@ -32,12 +33,16 @@ export function ReviewClient({
   weeklyWins,
   initialSatisfaction,
   initialReflection,
+  completedAt,
 }: {
   missedItems: MissedItem[];
   weeklyWins: WeeklyWin[];
   initialSatisfaction: number | null;
   initialReflection: string;
+  completedAt: string | null;
 }) {
+  const locked = isReviewLocked(completedAt);
+  const remaining = timeUntilLock(completedAt);
   const [items, setItems] = useState<Record<string, ItemState>>(() => {
     const seed: Record<string, ItemState> = {};
     for (const m of missedItems) {
@@ -56,6 +61,7 @@ export function ReviewClient({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (locked) return;
     if (satisfaction == null) {
       setError("Pick how the day felt overall.");
       return;
@@ -87,6 +93,21 @@ export function ReviewClient({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {locked ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-secondary/40 p-4 text-sm">
+          <Lock size={14} className="text-muted-foreground" />
+          <span>
+            This review is locked. Reviews are editable for {LOCK_HOURS}h after your first submit.
+          </span>
+        </div>
+      ) : remaining ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+          <Clock size={14} />
+          <span>Editable for another <span className="text-foreground">{remaining}</span>, then locked.</span>
+        </div>
+      ) : null}
+
+      <fieldset disabled={locked} className="space-y-8 disabled:opacity-70">
       {weeklyWins.length > 0 ? (
         <section className="space-y-3">
           <div>
@@ -200,10 +221,12 @@ export function ReviewClient({
         />
       </section>
 
+      </fieldset>
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <Button type="submit" disabled={submitting} className="w-full">
-        {submitting ? "Saving…" : "Close the day"}
+      <Button type="submit" disabled={submitting || locked} className="w-full">
+        {locked ? "Locked" : submitting ? "Saving…" : completedAt ? "Update review" : "Close the day"}
       </Button>
     </form>
   );

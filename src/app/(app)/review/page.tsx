@@ -41,7 +41,7 @@ export default async function ReviewPage() {
       .lte("completion_date", today),
     supabase
       .from("day_reviews")
-      .select("satisfaction_rating, reflection_text")
+      .select("satisfaction_rating, reflection_text, completed_at")
       .eq("user_id", user!.id)
       .eq("review_date", today)
       .maybeSingle(),
@@ -98,7 +98,7 @@ export default async function ReviewPage() {
       <PageHeader
         eyebrow="End of day"
         title="Reflect"
-        subtitle="Close the day honestly. The score locks once you submit."
+        subtitle="Close the day honestly. Editable for 12 hours after your first submit, then locked."
       />
 
       <ReviewClient
@@ -106,6 +106,7 @@ export default async function ReviewPage() {
         weeklyWins={weeklyWins}
         initialSatisfaction={existing?.satisfaction_rating ?? null}
         initialReflection={existing?.reflection_text ?? ""}
+        completedAt={existing?.completed_at ?? null}
       />
     </div>
   );

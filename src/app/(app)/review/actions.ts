@@ -6,6 +6,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { getTodayInTimezone, getWeekStart, getWeekEnd } from "@/lib/today";
 import { countsTowardDayScore } from "@/lib/habits";
 import { computeDayScore } from "@/lib/day-score";
+import { isReviewLocked, LOCK_HOURS } from "@/lib/review-lock";
 
 type MissedItemInput = {
   itemType: "habit" | "task";
@@ -41,6 +42,17 @@ export async function submitReview(input: SubmitReviewInput) {
     .single();
   const today = getTodayInTimezone(profile?.timezone ?? "UTC");
   const weekStart = getWeekStart(today);
+
+  // Lock check: reject edits made more than LOCK_HOURS after first submit.
+  const { data: existing } = await supabase
+    .from("day_reviews")
+    .select("completed_at")
+    .eq("user_id", user.id)
+    .eq("review_date", today)
+    .maybeSingle();
+  if (isReviewLocked(existing?.completed_at ?? null)) {
+    return { error: `This review is locked. Reviews are editable for ${LOCK_HOURS} hours after your first submit.` };
+  }
 
   // Fresh count of today's items + completions to snapshot the score against.
   const [{ data: habits }, { data: tasks }, { data: weekComps }] = await Promise.all([
@@ -107,7 +119,10 @@ export async function submitReview(input: SubmitReviewInput) {
 
   const now = new Date().toISOString();
 
-  // Upsert the day_reviews row.
+  // Preserve the ORIGINAL completed_at on re-submits so the 12h clock starts
+  // at first submit and doesn't reset with every edit.
+  const completedAt = existing?.completed_at ?? now;
+
   const { data: review, error: reviewError } = await supabase
     .from("day_reviews")
     .upsert(
@@ -117,7 +132,7 @@ export async function submitReview(input: SubmitReviewInput) {
         satisfaction_rating: input.satisfactionRating,
         reflection_text: input.reflectionText.trim() || null,
         day_score: snapshot.score,
-        completed_at: now,
+        completed_at: completedAt,
       },
       { onConflict: "user_id,review_date" },
     )
