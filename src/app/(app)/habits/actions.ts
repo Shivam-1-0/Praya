@@ -100,6 +100,35 @@ export async function archiveHabit(id: string): Promise<ActionResult> {
   return {};
 }
 
+// Persist a new ordering. `orderedIds` is the full list of active habit ids in
+// their new visual order; each row's sort_order is set to its index.
+// ponytail: N individual updates, fine for personal habit counts (<~20). If a
+// user ever has hundreds, switch to a single upsert or a SQL rank update.
+export async function reorderHabits(orderedIds: string[]): Promise<ActionResult> {
+  const supabase = await getSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from("habits")
+        .update({ sort_order: index })
+        .eq("id", id)
+        .eq("user_id", user.id),
+    ),
+  );
+
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { error: failed.error.message };
+
+  revalidatePath("/habits");
+  revalidatePath("/today");
+  return {};
+}
+
 export async function restoreHabit(id: string): Promise<ActionResult> {
   const supabase = await getSupabaseServer();
   const {

@@ -43,10 +43,10 @@ If you're tempted to use `getSupabaseServiceRole()` anywhere else, you're probab
 
 ## Current status (check before assuming something exists)
 
-- **Built and tested end-to-end:** auth, Habits/Tasks CRUD + shared completions, End-of-Day Review + score snapshotting, automation API (4 endpoints), Reflections PDF export.
-- **Not built:** Veyla (zero Gemini integration — placeholder UI + empty tables only), Admin surface, full Reset/Start-Fresh + JSON export, habit drag-reorder (`sort_order` column exists but is dormant; list order is `created_at`).
-- **Not deployed.** Nothing has run against anything but `localhost:3001` + the real Supabase project. `GEMINI_API_KEY`, prod `NEXT_PUBLIC_SITE_URL`/`VERCEL_URL` handling, and Supabase's redirect allowlist have never been exercised.
-- **"Weekly" habit frequency is a placeholder** that currently displays as daily — resolve this before building real Analytics on top of it.
+- **Built and tested end-to-end:** auth, Habits/Tasks CRUD + shared completions, End-of-Day Review + score snapshotting, automation API (4 endpoints), Reflections PDF export, Analytics (Phase 7), Veyla AI assistant (Phase 8), Admin surface (Phase 9), Reset/Start-Fresh + full JSON export (Phase 10 partial), habit reorder (up/down, `sort_order` live).
+- **Deployed** at `https://praya-black.vercel.app` via Vercel↔GitHub (`Shivam-1-0/Praya`, pushes to `main` auto-deploy). Requires env vars `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`, `GEMINI_API_KEY`. See HANDOFF §8.
+- **Weekly habit frequency is settled** — it's an N-per-week quota (`target_count`). See HANDOFF §9.1.
+- **Still open (product decisions, not bugs):** same-day review edit vs. permanent lock (§9.2), rate limiting on `/api/v1/*` (§9.6, `@upstash/ratelimit` drop-in when abuse shows up).
 
 ## Stack cheatsheet
 

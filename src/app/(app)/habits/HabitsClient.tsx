@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Archive, RotateCcw, CalendarDays, Star } from "lucide-react";
+import { Plus, Pencil, Archive, RotateCcw, CalendarDays, Star, ChevronUp, ChevronDown } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { CheckToggle } from "@/components/CheckToggle";
 import { frequencyLabel } from "@/lib/habits";
 import { toggleCompletion } from "@/lib/completions-actions";
 import { HabitForm, type Habit } from "./HabitForm";
-import { archiveHabit, restoreHabit } from "./actions";
+import { archiveHabit, restoreHabit, reorderHabits } from "./actions";
 
 type ActiveHabit = Habit & { complete: boolean };
 
@@ -31,7 +31,29 @@ export function HabitsClient({
   );
   const [, startTransition] = useTransition();
 
+  // Local order so up/down feels instant. Re-seed only when the SET of active
+  // habits changes (create/archive/edit) — a pure reorder keeps membership the
+  // same, so the optimistic order survives the router.refresh() that follows.
+  const [ordered, setOrdered] = useState<ActiveHabit[]>(activeHabits);
+  const membershipKey = activeHabits.map((h) => h.id).sort().join(",");
+  const seededKey = useRef(membershipKey);
+  if (seededKey.current !== membershipKey) {
+    seededKey.current = membershipKey;
+    setOrdered(activeHabits);
+  }
+
   const importantCount = activeHabits.filter((h) => h.is_important).length;
+
+  function move(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= ordered.length) return;
+    const next = ordered.slice();
+    [next[index], next[target]] = [next[target], next[index]];
+    setOrdered(next);
+    startTransition(async () => {
+      await reorderHabits(next.map((h) => h.id));
+    });
+  }
 
   function toggle(id: string) {
     const wasDone = done.has(id);
@@ -103,11 +125,29 @@ export function HabitsClient({
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {activeHabits.map((habit) => {
+          {ordered.map((habit, index) => {
             const isDone = done.has(habit.id);
             return (
               <div key={habit.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start gap-3">
+                  <div className="flex flex-col">
+                    <IconButton
+                      label="Move up"
+                      disabled={index === 0}
+                      onClick={() => move(index, -1)}
+                      size="sm"
+                    >
+                      <ChevronUp size={14} />
+                    </IconButton>
+                    <IconButton
+                      label="Move down"
+                      disabled={index === ordered.length - 1}
+                      onClick={() => move(index, 1)}
+                      size="sm"
+                    >
+                      <ChevronDown size={14} />
+                    </IconButton>
+                  </div>
                   <CheckToggle
                     shape="square"
                     size="lg"
@@ -197,11 +237,13 @@ function IconButton({
   label,
   onClick,
   disabled,
+  size = "md",
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  size?: "sm" | "md";
   children: React.ReactNode;
 }) {
   return (
@@ -210,7 +252,9 @@ function IconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
+      className={`flex items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-30 ${
+        size === "sm" ? "size-5" : "size-8"
+      }`}
     >
       {children}
     </button>
