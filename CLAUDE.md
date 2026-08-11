@@ -15,9 +15,10 @@ Run `git log` and `git status` first. Don't assume a clean tree. Commit when a f
 
 **Two-layer route protection** — `PROTECTED_PREFIXES` in `src/lib/supabase/middleware.ts` (redirect UX) AND `(app)/layout.tsx`'s `getUser()` check (defense-in-depth). Both required. Don't remove either.
 
-**Service-role key containment.** The service-role client bypasses RLS. It is used in EXACTLY two files, for narrow reasons that don't have a session to key off:
+**Service-role key containment.** The service-role client bypasses RLS. It is used in EXACTLY three files, for narrow reasons that don't have a session to key off:
 - `src/lib/automation/queries.ts` — external API-key requests have no Supabase session, so RLS can't apply. Every function in this file takes `userId` as its mandatory first parameter and every query filters explicitly on it. If you add a function here, you must do the same.
 - `src/lib/automation/auth.ts` — the api_keys hash lookup itself has no user to scope by (it's *resolving* who the request belongs to).
+- `src/lib/admin/queries.ts` — admin cross-user reads + `admin_audit_log` writes. Gated by `requireAdmin()` in `src/lib/admin/guard.ts`; every cross-user read audit-logs.
 
 If you're tempted to use `getSupabaseServiceRole()` anywhere else, you're probably solving the wrong problem. Anon client + RLS is the answer for anything with a session.
 
@@ -33,7 +34,7 @@ If you're tempted to use `getSupabaseServiceRole()` anywhere else, you're probab
 
 **Base UI, not Radix.** `@base-ui/react`'s `Button` uses a `render` prop for polymorphism, not `asChild`. Pass `nativeButton={false}` when rendering it as a non-`<button>` element (e.g. `<Button render={<Link href="/login" />} nativeButton={false}>`), or it throws a console warning.
 
-**Dev server doesn't persist between sessions.** "My app isn't opening" almost always means the dev server needs restarting, not a real bug — it's only alive while explicitly started in an active session. Real fix is deploying to Vercel (not done yet, see Status below).
+**Dev server doesn't persist between sessions.** "My app isn't opening" for local dev almost always means the dev server needs restarting, not a real bug — it's only alive while explicitly started. Prod is always live at `praya-black.vercel.app`; use it when you can, dev server only when you're actively editing.
 
 **Turbopack can show stale/phantom errors after a refactor** (duplicate definitions that don't exist on disk, module-not-found after installing a package mid-session). Confirm with `tsc --noEmit` or a direct file read before trusting it — if confirmed stale, restart the dev server rather than debugging code that's already correct.
 
@@ -46,7 +47,8 @@ If you're tempted to use `getSupabaseServiceRole()` anywhere else, you're probab
 - **Built and tested end-to-end:** auth, Habits/Tasks CRUD + shared completions, End-of-Day Review + score snapshotting, automation API (4 endpoints), Reflections PDF export, Analytics (Phase 7), Veyla AI assistant (Phase 8), Admin surface (Phase 9), Reset/Start-Fresh + full JSON export (Phase 10 partial), habit reorder (up/down, `sort_order` live).
 - **Deployed** at `https://praya-black.vercel.app` via Vercel↔GitHub (`Shivam-1-0/Praya`, pushes to `main` auto-deploy). Requires env vars `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`, `GEMINI_API_KEY`. See HANDOFF §8.
 - **Weekly habit frequency is settled** — it's an N-per-week quota (`target_count`). See HANDOFF §9.1.
-- **Still open (product decisions, not bugs):** same-day review edit vs. permanent lock (§9.2), rate limiting on `/api/v1/*` (§9.6, `@upstash/ratelimit` drop-in when abuse shows up).
+- **Review edit window:** editable for 12 hours after the first submit, then permanently locked. Math in `src/lib/review-lock.ts` (runnable check alongside).
+- **Still open (deliberately deferred):** rate limiting on `/api/v1/*` (§9.6, `@upstash/ratelimit` drop-in when abuse shows up). Every other §9 item is resolved.
 
 ## Stack cheatsheet
 
