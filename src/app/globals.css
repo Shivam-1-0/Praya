@@ -101,6 +101,13 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* Speed up Next.js's <ViewTransition> crossfade — the browser default of
+     250ms compounds with our Motion mount animations and made tab switches
+     feel laggy. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 140ms;
+  }
   /* Honor the user's motion preference — Motion reads this too. */
   @media (prefers-reduced-motion: reduce) {
     *,
