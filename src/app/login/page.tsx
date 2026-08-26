@@ -1,8 +1,6 @@
 import Link from "next/link";
+import { ArrowRight, Mail } from "lucide-react";
 import { sendMagicLink } from "./actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 type SearchParams = { sent?: string; error?: string; next?: string };
 
@@ -14,52 +12,79 @@ export default async function LoginPage({
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen flex-col justify-center bg-background px-6 py-16 text-foreground">
+    <main className="flex min-h-screen flex-col justify-center bg-background px-6 py-16">
       <div className="mx-auto w-full max-w-sm">
-        <Link href="/" className="mb-10 flex items-center justify-center">
-          <span className="text-lg font-semibold tracking-[0.2em] text-primary uppercase">
-            Praya
-          </span>
-        </Link>
+        {/* Espresso hero card — the one dramatic dark moment. */}
+        <div className="relative overflow-hidden rounded-3xl bg-foreground px-8 py-12 text-background">
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 50% -10%, rgba(232,183,118,0.18), transparent 60%)",
+            }}
+          />
 
-        <div className="rounded-2xl border border-border bg-card p-8">
-          <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            We&apos;ll email you a magic link. No password needed.
-          </p>
+          <div className="relative text-center">
+            <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-muted-foreground">
+              Praya
+            </p>
+            <p className="mt-5 text-accent" style={{ letterSpacing: "0.5em" }}>
+              ·
+            </p>
 
-          {params.sent ? (
-            <div className="mt-6 rounded-lg border border-border bg-muted p-4 text-sm">
-              Check <span className="font-medium text-foreground">{params.sent}</span>{" "}
-              for your magic link. It expires in 10 minutes.
-            </div>
-          ) : (
-            <form action={sendMagicLink} className="mt-6 space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                />
+            <h1 className="mt-4 font-serif text-4xl font-normal tracking-tight text-background">
+              Welcome back.
+            </h1>
+            <p className="mt-1 font-serif text-lg italic text-muted-foreground">
+              Your day is waiting.
+            </p>
+
+            {params.sent ? (
+              <div className="mt-8 rounded-xl border border-accent/25 bg-background/5 p-4 text-left text-sm text-background/90">
+                Check{" "}
+                <span className="font-medium text-accent">{params.sent}</span> for
+                your magic link. It expires in 10 minutes.
               </div>
-              <input type="hidden" name="next" value={params.next ?? "/today"} />
-              {params.error ? (
-                <p className="text-sm text-destructive">{params.error}</p>
-              ) : null}
-              <Button type="submit" className="w-full">
-                Send magic link
-              </Button>
-            </form>
-          )}
+            ) : (
+              <form action={sendMagicLink} className="mt-8 space-y-3 text-left">
+                <div className="flex items-center gap-3 rounded-xl border border-accent/25 bg-background/5 px-4 py-3 transition-colors focus-within:border-accent/60">
+                  <Mail size={16} className="shrink-0 text-muted-foreground" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="name@example.com"
+                    className="w-full bg-transparent text-sm text-background placeholder:text-muted-foreground focus:outline-none"
+                  />
+                </div>
+                <input
+                  type="hidden"
+                  name="next"
+                  value={params.next ?? "/today"}
+                />
+                {params.error ? (
+                  <p className="text-sm text-destructive">{params.error}</p>
+                ) : null}
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  Send magic link
+                  <ArrowRight size={15} />
+                </button>
+                <p className="pt-2 text-center text-[11px] text-muted-foreground">
+                  No password. We&apos;ll email you a link.
+                </p>
+              </form>
+            )}
+          </div>
         </div>
 
         <Link
           href="/"
-          className="mt-6 block text-center text-sm text-muted-foreground hover:text-foreground"
+          className="mt-6 block text-center text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           ← Back to home
         </Link>

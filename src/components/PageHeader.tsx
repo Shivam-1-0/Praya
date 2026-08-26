@@ -12,10 +12,12 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-xs font-medium uppercase tracking-[0.22em] text-primary/80">
+        <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-muted-foreground">
           {eyebrow}
         </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight md:text-5xl">{title}</h1>
+        <h1 className="mt-3 font-serif text-4xl font-normal tracking-tight md:text-6xl">
+          {title}
+        </h1>
         {subtitle ? (
           <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
         ) : null}
