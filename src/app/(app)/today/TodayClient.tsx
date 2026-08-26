@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Sparkles, CircleCheck } from "lucide-react";
-import { PageHeader } from "@/components/PageHeader";
+import { Plus, Sparkles, CircleCheck, ArrowRight } from "lucide-react";
 import { CheckToggle } from "@/components/CheckToggle";
+import { RingMeter } from "@/components/RingMeter";
+import { Stagger, FadeIn } from "@/components/motion";
 import { toggleCompletion } from "@/lib/completions-actions";
 
 type HabitItem = {
@@ -90,34 +91,55 @@ export function TodayClient({
   const habitsDone = habits.filter((h) => done.has(keyOf("habit", h.id))).length;
   const tasksDone = tasks.filter((t) => done.has(keyOf("task", t.id))).length;
 
-  const metric = (
-    <div className="flex items-stretch divide-x divide-border overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="px-5 py-3">
-        <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Done today</p>
-        <p className="mt-1 text-2xl font-semibold">
-          <span className="text-primary">{doneCount}</span>
-          <span className="text-lg text-muted-foreground"> / {totalItems}</span>
-        </p>
-      </div>
-      <div className="px-5 py-3">
-        <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Completion</p>
-        <p className="mt-1 text-2xl font-semibold text-primary">{pct}%</p>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-8">
-      <PageHeader
-        eyebrow="Today's agenda"
-        title={weekday}
-        subtitle={`${greeting}${name ? `, ${name}` : ""} · ${dateLabel}`}
-        right={metric}
-      />
+      {/* Serif greeting */}
+      <FadeIn>
+        <div className="flex items-baseline justify-between">
+          <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-muted-foreground">
+            Today
+          </p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-muted-foreground tabular">
+            {dateLabel}
+          </p>
+        </div>
+        <h1 className="mt-3 font-serif text-5xl font-normal leading-[1.05] tracking-tight md:text-6xl">
+          {greeting}
+          {name ? (
+            <>
+              ,<br />
+              <span className="italic text-primary">{name}.</span>
+            </>
+          ) : (
+            "."
+          )}
+        </h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {weekday} · {totalItems === 0 ? "Nothing scheduled" : `${totalItems} things to tend to`}
+        </p>
+      </FadeIn>
 
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-      </div>
+      {/* Ring meter + rhythm */}
+      <FadeIn delay={0.05}>
+        <div className="flex items-center gap-6 rounded-2xl border border-border bg-card p-6">
+          <RingMeter pct={pct} />
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
+              Today&apos;s rhythm
+            </p>
+            <p className="mt-1 font-serif text-2xl tabular">
+              {doneCount} <span className="text-base text-muted-foreground">of {totalItems}</span>
+            </p>
+            <p className="mt-1 text-xs italic text-muted-foreground">
+              {pct === 100 && totalItems > 0
+                ? "A full day, kept."
+                : pct >= 60
+                  ? "On pace for a good day."
+                  : "Room to make it count."}
+            </p>
+          </div>
+        </div>
+      </FadeIn>
 
       <div className="grid gap-5 md:grid-cols-2">
         <ItemCard
@@ -131,28 +153,30 @@ export function TodayClient({
           {habits.map((habit) => {
             const isDone = done.has(keyOf("habit", habit.id));
             return (
-              <div key={habit.id} className="flex items-center gap-3 py-3">
-                <CheckToggle
-                  shape="square"
-                  done={isDone}
-                  label={habit.title}
-                  onClick={() => toggle("habit", habit.id)}
-                />
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-xs font-medium text-muted-foreground">
-                  {habit.title.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className={`truncate text-sm font-medium ${isDone ? "text-muted-foreground" : ""}`}>
-                      {habit.title}
-                    </p>
-                    {habit.is_important ? (
-                      <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Important" />
-                    ) : null}
+              <Stagger.Item key={habit.id}>
+                <div className="flex items-center gap-3 py-3">
+                  <CheckToggle
+                    shape="square"
+                    done={isDone}
+                    label={habit.title}
+                    onClick={() => toggle("habit", habit.id)}
+                  />
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary font-serif text-sm italic text-primary">
+                    {habit.title.charAt(0).toUpperCase()}
                   </div>
-                  <p className="text-xs text-muted-foreground">{FREQUENCY_LABEL[habit.frequency_type]}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className={`truncate text-sm font-medium ${isDone ? "text-muted-foreground line-through decoration-border" : ""}`}>
+                        {habit.title}
+                      </p>
+                      {habit.is_important ? (
+                        <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Important" />
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{FREQUENCY_LABEL[habit.frequency_type]}</p>
+                  </div>
                 </div>
-              </div>
+              </Stagger.Item>
             );
           })}
         </ItemCard>
@@ -168,61 +192,74 @@ export function TodayClient({
           {tasks.map((task) => {
             const isDone = done.has(keyOf("task", task.id));
             return (
-              <div key={task.id} className="flex items-center gap-3 py-3">
-                <CheckToggle
-                  shape="circle"
-                  done={isDone}
-                  label={task.title}
-                  onClick={() => toggle("task", task.id)}
-                />
-                <p className={`flex-1 text-sm ${isDone ? "text-muted-foreground line-through" : ""}`}>
-                  {task.title}
-                </p>
-                {task.priority ? (
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {task.priority}
-                  </span>
-                ) : null}
-              </div>
+              <Stagger.Item key={task.id}>
+                <div className="flex items-center gap-3 py-3">
+                  <CheckToggle
+                    shape="circle"
+                    done={isDone}
+                    label={task.title}
+                    onClick={() => toggle("task", task.id)}
+                  />
+                  <p className={`flex-1 text-sm ${isDone ? "text-muted-foreground line-through decoration-border" : ""}`}>
+                    {task.title}
+                  </p>
+                  {task.priority ? (
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.15em] ${
+                        task.priority === "high"
+                          ? "bg-foreground text-accent"
+                          : "border border-border text-muted-foreground"
+                      }`}
+                    >
+                      {task.priority}
+                    </span>
+                  ) : null}
+                </div>
+              </Stagger.Item>
             );
           })}
         </ItemCard>
       </div>
 
+      {/* Reflect CTA — the one espresso moment */}
       {reviewedScore != null ? (
-        <div className="flex items-center justify-between rounded-2xl border border-primary/40 bg-primary/5 p-5">
-          <div className="flex items-center gap-3">
-            <CircleCheck className="text-primary" size={22} strokeWidth={1.75} />
-            <div>
-              <p className="text-sm font-medium text-primary">Day closed</p>
-              <p className="text-xs text-muted-foreground">
-                Your reflection is saved. Score locked at {reviewedScore}%.
-              </p>
+        <FadeIn>
+          <div className="flex items-center justify-between rounded-2xl border border-primary/40 bg-primary/5 p-5">
+            <div className="flex items-center gap-3">
+              <CircleCheck className="text-primary" size={22} strokeWidth={1.75} />
+              <div>
+                <p className="text-sm font-medium text-primary">Day closed</p>
+                <p className="text-xs text-muted-foreground">
+                  Your reflection is saved. Score locked at {reviewedScore}%.
+                </p>
+              </div>
             </div>
+            <Link href="/review" className="text-xs text-muted-foreground hover:text-foreground">
+              Edit
+            </Link>
           </div>
+        </FadeIn>
+      ) : (
+        <FadeIn>
           <Link
             href="/review"
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-foreground p-5 text-background transition-transform hover:scale-[1.005]"
           >
-            Edit
-          </Link>
-        </div>
-      ) : (
-        <Link
-          href="/review"
-          className="flex items-center justify-between rounded-2xl border border-dashed border-border p-5 transition-colors hover:border-primary/50"
-        >
-          <div className="flex items-center gap-3">
-            <Sparkles className="text-primary" size={22} strokeWidth={1.75} />
-            <div>
-              <p className="text-sm font-medium">Reflect on today</p>
-              <p className="text-xs text-muted-foreground">
-                Close the day honestly. Takes a minute.
-              </p>
+            <span
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(circle at 100% 0%, rgba(232,183,118,0.18), transparent 60%)",
+              }}
+            />
+            <Sparkles className="relative text-accent" size={20} strokeWidth={1.75} />
+            <div className="relative flex-1">
+              <p className="font-serif text-lg">Reflect on today.</p>
+              <p className="text-xs text-muted-foreground">One minute. Then rest.</p>
             </div>
-          </div>
-          <span className="text-xs text-muted-foreground">→</span>
-        </Link>
+            <ArrowRight className="relative text-accent transition-transform group-hover:translate-x-1" size={16} />
+          </Link>
+        </FadeIn>
       )}
     </div>
   );
@@ -248,21 +285,24 @@ function ItemCard({
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-        <span className="text-xs text-muted-foreground">
-          {countDone} of {countTotal} completed
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
+        <span className="text-xs text-muted-foreground tabular">
+          {countDone} of {countTotal}
         </span>
       </div>
-      <div className="divide-y divide-border">
-        {countTotal === 0 ? <p className="py-3 text-sm text-muted-foreground">{emptyText}</p> : children}
-      </div>
+      <Stagger className="divide-y divide-border">
+        {countTotal === 0 ? (
+          <p className="py-3 text-sm text-muted-foreground">{emptyText}</p>
+        ) : (
+          children
+        )}
+      </Stagger>
       <Link
         href={addHref}
-        className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="mt-4 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
       >
         <Plus size={15} /> {addLabel}
       </Link>
     </section>
   );
 }
-
