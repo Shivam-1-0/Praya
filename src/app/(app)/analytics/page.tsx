@@ -136,15 +136,15 @@ export default async function AnalyticsPage({
       />
 
       <div className="flex items-center gap-2 text-xs">
-        <span className="uppercase tracking-[0.2em] text-muted-foreground">Window</span>
+        <span className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Window</span>
         {Object.entries(WINDOWS).map(([key, w]) => (
           <Link
             key={key}
             href={`/analytics?window=${key}`}
-            className={`rounded-full border px-3 py-1 transition ${
+            className={`rounded-full px-3 py-1 transition-colors ${
               key === winKey
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground"
+                ? "bg-foreground text-accent"
+                : "border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
             }`}
           >
             {w.label}
@@ -154,10 +154,10 @@ export default async function AnalyticsPage({
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile
-          label={`Completion (${WINDOWS[winKey].label})`}
+          label="Completion"
           value={overallRate == null ? "—" : `${overallRate}%`}
-          hint={`${overallCompleted} / ${overallScheduled}`}
-          accent
+          hint={`${overallCompleted} / ${overallScheduled} · ${WINDOWS[winKey].label}`}
+          invert
         />
         <StatTile
           label="Important consistency"
@@ -177,37 +177,28 @@ export default async function AnalyticsPage({
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Day-score trend
-        </p>
+        <div className="flex items-baseline justify-between">
+          <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
+            Day-score trend
+          </p>
+          {trendAvg != null ? (
+            <p className="text-xs text-muted-foreground">
+              avg <span className="font-serif text-base text-foreground tabular">{trendAvg}</span>
+            </p>
+          ) : null}
+        </div>
         {trendPresent.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
             No End-of-Day reviews in this window yet.
           </p>
         ) : (
-          <div className="mt-6 flex h-32 items-end gap-[2px]">
-            {trendValues.map((v, i) => {
-              const h = v == null ? 0 : Math.max(2, Math.round(v));
-              return (
-                <div
-                  key={trendDays[i]}
-                  className="flex-1"
-                  title={v == null ? `${trendDays[i]}: —` : `${trendDays[i]}: ${v}`}
-                >
-                  <div
-                    className={`w-full rounded-t ${v == null ? "bg-border/40" : "bg-primary/80"}`}
-                    style={{ height: `${v == null ? 2 : h}%` }}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <Sparkline values={trendValues} />
         )}
       </section>
 
       <section className="rounded-2xl border border-border bg-card">
         <div className="border-b border-border p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
             Per-habit ({WINDOWS[winKey].label})
           </p>
         </div>
@@ -257,17 +248,48 @@ function StatTile({
   value,
   hint,
   accent,
+  invert,
 }: {
   label: string;
   value: string;
   hint?: string;
   accent?: boolean;
+  invert?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${accent ? "text-primary" : ""}`}>{value}</p>
-      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
+    <div
+      className={`relative overflow-hidden rounded-2xl border p-4 ${
+        invert ? "border-foreground bg-foreground" : "border-border bg-card"
+      }`}
+    >
+      {invert ? (
+        <span
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at 100% 0%, rgba(232,183,118,0.2), transparent 65%)",
+          }}
+        />
+      ) : null}
+      <p
+        className={`relative text-[10px] font-medium uppercase tracking-[0.28em] ${
+          invert ? "text-accent" : "text-muted-foreground"
+        }`}
+      >
+        {label}
+      </p>
+      <p
+        className={`relative mt-2 font-serif text-3xl tabular ${
+          invert ? "text-background" : accent ? "text-primary" : "text-foreground"
+        }`}
+      >
+        {value}
+      </p>
+      {hint && (
+        <p className={`relative mt-1 text-[11px] ${invert ? "text-muted-foreground" : "text-muted-foreground"}`}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
@@ -286,8 +308,41 @@ function Cell({
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`text-base font-semibold ${emphasize ? "text-primary" : ""}`}>{value}</p>
-      {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
+      <p className={`font-serif text-xl tabular ${emphasize ? "text-primary" : ""}`}>{value}</p>
+      {sub && <p className="text-[10px] text-muted-foreground tabular">{sub}</p>}
     </div>
+  );
+}
+
+// Honey-washed area sparkline for the day-score trend. Server-rendered SVG.
+// `values` may contain nulls (unreviewed days); the line connects present points.
+function Sparkline({ values }: { values: (number | null)[] }) {
+  const W = 300;
+  const H = 64;
+  const n = values.length;
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = values[i];
+    if (v == null) continue;
+    const x = n === 1 ? W : (i / (n - 1)) * W;
+    const y = H - (Math.max(0, Math.min(100, v)) / 100) * H;
+    pts.push({ x, y });
+  }
+  if (pts.length === 0) return null;
+  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
+  const last = pts[pts.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="mt-6">
+      <defs>
+        <linearGradient id="trendWash" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#e8b776" stopOpacity="0.32" />
+          <stop offset="100%" stopColor="#e8b776" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#trendWash)" />
+      <path d={line} fill="none" stroke="#a87738" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={last.x} cy={last.y} r={3} fill="#a87738" />
+    </svg>
   );
 }

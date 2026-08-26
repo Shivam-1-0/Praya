@@ -93,27 +93,40 @@ export default async function DashboardPage() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Today's completion" value={`${pctToday}%`} accent />
+        <StatTile label="Today's completion" value={`${pctToday}%`} invert />
         <StatTile label="Active habits" value={String(activeHabits.length)} />
         <StatTile label="Tasks today" value={String(taskCount)} />
-        <StatTile label="Important habits" value={`${importantCount} / 3`} />
+        <StatTile label="Important habits" value={`${importantCount} / 3`} accent />
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">This week</p>
-        <div className="mt-6 flex h-32 items-end gap-2">
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Daily rhythm · this week</p>
+        <div className="mt-8 flex h-32 items-end gap-2">
           {week.map((d, i) => {
             const h = Math.round((weekCounts[i] / peak) * 100);
+            const isPeak = weekCounts[i] === peak && weekCounts[i] > 0;
+            const isToday = d === today;
             return (
               <div key={d} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-full w-full items-end">
+                <div className="relative flex h-full w-full items-end">
+                  {isPeak ? (
+                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 font-serif text-sm text-primary tabular">
+                      {weekCounts[i]}
+                    </span>
+                  ) : null}
                   <div
-                    className="w-full rounded-t bg-primary/80"
+                    className={`w-full rounded-t ${
+                      weekCounts[i] === 0
+                        ? "bg-secondary"
+                        : isPeak
+                          ? "bg-primary"
+                          : "bg-accent"
+                    }`}
                     style={{ height: `${weekCounts[i] === 0 ? 2 : h}%` }}
                     title={`${d}: ${weekCounts[i]}`}
                   />
                 </div>
-                <span className="text-[10px] text-muted-foreground">
+                <span className={`text-[10px] ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                   {new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}
                 </span>
               </div>
@@ -123,8 +136,8 @@ export default async function DashboardPage() {
       </section>
 
       <section className="rounded-2xl border border-dashed border-border p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Latest reflection</p>
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Latest reflection</p>
+        <p className="mt-3 font-serif text-lg italic text-muted-foreground">
           Your reflections will appear here after your first End-of-Day review.
         </p>
       </section>
@@ -132,11 +145,46 @@ export default async function DashboardPage() {
   );
 }
 
-function StatTile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function StatTile({
+  label,
+  value,
+  accent,
+  invert,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  invert?: boolean;
+}) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${accent ? "text-primary" : ""}`}>{value}</p>
+    <div
+      className={`relative overflow-hidden rounded-2xl border p-4 ${
+        invert ? "border-foreground bg-foreground" : "border-border bg-card"
+      }`}
+    >
+      {invert ? (
+        <span
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at 100% 0%, rgba(232,183,118,0.2), transparent 65%)",
+          }}
+        />
+      ) : null}
+      <p
+        className={`relative text-[10px] font-medium uppercase tracking-[0.28em] ${
+          invert ? "text-accent" : "text-muted-foreground"
+        }`}
+      >
+        {label}
+      </p>
+      <p
+        className={`relative mt-2 font-serif text-3xl tabular ${
+          invert ? "text-background" : accent ? "text-primary" : "text-foreground"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
