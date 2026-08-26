@@ -81,7 +81,7 @@ export function TasksClient({ tasks, today }: { tasks: TaskRow[]; today: string 
   function Row({ task }: { task: TaskRow }) {
     const isDone = done.has(task.id);
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5">
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 transition-transform hover:-translate-y-0.5">
         <CheckToggle
           shape="circle"
           done={isDone}
@@ -95,7 +95,7 @@ export function TasksClient({ tasks, today }: { tasks: TaskRow[]; today: string 
           <div className="mt-1 flex flex-wrap gap-1.5">
             <Chip>{formatDue(task.due_date, today)}</Chip>
             {task.priority ? (
-              <Chip icon={Flag} tone={task.priority === "high" ? "gold" : "muted"}>
+              <Chip icon={Flag} tone={task.priority === "high" ? "dark" : "muted"}>
                 {task.priority}
               </Chip>
             ) : null}
@@ -179,7 +179,7 @@ export function TasksClient({ tasks, today }: { tasks: TaskRow[]; today: string 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
       <div className="space-y-2.5">{children}</div>
     </div>
   );

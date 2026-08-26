@@ -111,7 +111,7 @@ export function ReviewClient({
       {weeklyWins.length > 0 ? (
         <section className="space-y-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">This week&apos;s wins</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">This week&apos;s wins</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Weekly targets you&apos;ve already met — keep it going.
             </p>
@@ -134,7 +134,7 @@ export function ReviewClient({
       {missedItems.length > 0 ? (
         <section className="space-y-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Missed items</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Missed items</p>
             <p className="mt-1 text-sm text-muted-foreground">
               For each item you didn&apos;t finish, note why — and be honest about whether that
               reason was valid.
@@ -190,8 +190,11 @@ export function ReviewClient({
       ) : null}
 
       <section className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">How did today feel?</p>
-        <div className="grid grid-cols-5 gap-2">
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
+          End of day
+        </p>
+        <h2 className="font-serif text-3xl font-normal tracking-tight">How did today feel?</h2>
+        <div className="grid grid-cols-5 gap-2 pt-1">
           {SATISFACTION_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -199,25 +202,27 @@ export function ReviewClient({
               onClick={() => setSatisfaction(opt.value)}
               className={`rounded-xl border py-3 text-center transition-colors ${
                 satisfaction === opt.value
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border text-muted-foreground hover:text-foreground"
+                  ? "border-foreground bg-foreground text-accent"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
               }`}
             >
-              <p className="text-lg font-semibold">{opt.value}</p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">{opt.label}</p>
+              <p className="font-serif text-2xl leading-none">{opt.value}</p>
+              <p className="mt-1 text-[9px] uppercase tracking-[0.08em]">{opt.label}</p>
             </button>
           ))}
         </div>
       </section>
 
       <section className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reflection</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
+          One reflection
+        </p>
         <textarea
           value={reflection}
           onChange={(e) => setReflection(e.target.value)}
           placeholder="What did today teach you?"
           rows={4}
-          className="w-full resize-none rounded-2xl border border-border bg-card px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full resize-none rounded-2xl border border-border bg-card px-4 py-3 font-serif text-lg italic placeholder:not-italic placeholder:font-sans placeholder:text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
       </section>
 

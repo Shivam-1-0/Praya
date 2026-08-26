@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Pencil, Archive, RotateCcw, CalendarDays, Star, ChevronUp, ChevronDown } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { CheckToggle } from "@/components/CheckToggle";
+import { Stagger } from "@/components/motion";
 import { frequencyLabel } from "@/lib/habits";
 import { toggleCompletion } from "@/lib/completions-actions";
 import { HabitForm, type Habit } from "./HabitForm";
@@ -124,11 +125,19 @@ export function HabitsClient({
           <p className="text-sm text-muted-foreground">No habits yet. Add your first one below.</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <Stagger className="grid gap-4 md:grid-cols-2">
           {ordered.map((habit, index) => {
             const isDone = done.has(habit.id);
             return (
-              <div key={habit.id} className="rounded-2xl border border-border bg-card p-4">
+              <Stagger.Item key={habit.id}>
+              <div
+                className={`relative overflow-hidden rounded-2xl border border-border bg-card p-4 transition-transform hover:-translate-y-0.5 ${
+                  habit.is_important ? "pl-5" : ""
+                }`}
+              >
+                {habit.is_important ? (
+                  <span className="absolute inset-y-4 left-0 w-1 rounded-full bg-primary" aria-hidden />
+                ) : null}
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col">
                     <IconButton
@@ -184,9 +193,10 @@ export function HabitsClient({
                   </div>
                 </div>
               </div>
+              </Stagger.Item>
             );
           })}
-        </div>
+        </Stagger>
       )}
 
       {!showForm ? (
