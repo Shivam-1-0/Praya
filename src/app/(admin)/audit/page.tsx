@@ -16,7 +16,7 @@ export default async function AdminAuditPage() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
-          <thead className="border-b border-border bg-background/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+          <thead className="border-b border-border bg-secondary/40 text-left text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             <tr>
               <th className="px-4 py-3">When</th>
               <th className="px-4 py-3">Admin</th>

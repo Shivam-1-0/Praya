@@ -11,8 +11,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
             <Shield size={16} className="text-primary" />
-            <Link href="/admin" className="text-sm font-semibold tracking-[0.2em] uppercase">
-              Praya Admin
+            <Link href="/admin" className="font-serif text-lg italic">
+              Praya <span className="text-muted-foreground">Admin</span>
             </Link>
           </div>
           <div className="flex items-center gap-6 text-sm">

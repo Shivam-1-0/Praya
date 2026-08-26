@@ -17,7 +17,7 @@ export default async function AdminUsersPage() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
-          <thead className="border-b border-border bg-background/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+          <thead className="border-b border-border bg-secondary/40 text-left text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Name / email</th>
               <th className="px-4 py-3">Timezone</th>
@@ -42,9 +42,9 @@ export default async function AdminUsersPage() {
                   <p className="font-mono text-[11px] text-muted-foreground">{u.user_id.slice(0, 8)}…</p>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{u.timezone}</td>
-                <td className="px-4 py-3 text-right">{u.active_habit_count}</td>
-                <td className="px-4 py-3 text-right">{u.reviews_count}</td>
-                <td className="px-4 py-3 text-muted-foreground">
+                <td className="px-4 py-3 text-right tabular">{u.active_habit_count}</td>
+                <td className="px-4 py-3 text-right tabular">{u.reviews_count}</td>
+                <td className="px-4 py-3 text-muted-foreground tabular">
                   {new Date(u.created_at).toISOString().slice(0, 10)}
                 </td>
                 <td className="px-4 py-3 text-right">

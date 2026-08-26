@@ -33,7 +33,7 @@ export default async function AdminUserPage({
       />
 
       <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Profile</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Profile</p>
         <dl className="mt-4 grid gap-4 sm:grid-cols-4">
           <Field label="User ID" value={<span className="font-mono text-xs">{p.user_id}</span>} />
           <Field label="Timezone" value={p.timezone} />
@@ -49,7 +49,7 @@ export default async function AdminUserPage({
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Active habits</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Active habits</p>
         {overview.activeHabits.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No active habits.</p>
         ) : (
@@ -72,7 +72,7 @@ export default async function AdminUserPage({
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
           Recent reviews (last 7)
         </p>
         {overview.recentReviews.length === 0 ? (
@@ -109,8 +109,8 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
+      <p className="mt-2 font-serif text-3xl tabular">{value}</p>
     </div>
   );
 }
