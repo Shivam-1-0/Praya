@@ -32,7 +32,7 @@ export default async function AppLayout({
       <div className="min-w-0 flex-1">
         <header className="border-b border-border md:hidden">
           <div className="mx-auto flex max-w-md items-center justify-between px-5 py-4">
-            <Link href="/today" className="text-sm font-semibold tracking-[0.2em] text-primary uppercase">
+            <Link href="/today" className="font-serif text-xl italic text-primary">
               Praya
             </Link>
             <Link

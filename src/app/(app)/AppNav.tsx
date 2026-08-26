@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import {
   CalendarCheck,
   ListChecks,
@@ -19,25 +20,33 @@ const TABS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ];
 
-// Bottom tab bar — phones only (hidden at md and up).
+// Bottom tab bar — phones only (hidden at md and up). Floating pill with a
+// shared-layout active indicator that glides between tabs.
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card md:hidden">
-      <div className="mx-auto flex max-w-md items-center justify-around px-1 py-2">
+    <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-center pb-4 md:hidden">
+      <div className="flex items-center gap-1 rounded-full border border-border bg-card/90 px-2 py-1.5 shadow-lg backdrop-blur">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] transition-colors ${
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              aria-label={label}
+              className={`relative flex size-11 items-center justify-center rounded-full transition-colors ${
+                active ? "text-accent-foreground" : "text-muted-foreground"
               }`}
             >
-              <Icon size={19} strokeWidth={1.75} />
-              {label}
+              {active ? (
+                <motion.span
+                  layoutId="bottomNavActive"
+                  className="absolute inset-0 rounded-full bg-foreground"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                />
+              ) : null}
+              <Icon size={20} strokeWidth={1.75} className="relative" />
             </Link>
           );
         })}
@@ -53,9 +62,7 @@ export function SideNav({ name, email }: { name: string | null; email: string })
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border px-4 py-6 md:flex">
-      <span className="mb-9 px-3 text-base font-semibold tracking-[0.28em] text-primary uppercase">
-        Praya
-      </span>
+      <span className="mb-9 px-3 font-serif text-2xl italic text-primary">Praya</span>
 
       <nav className="flex flex-col gap-1">
         {TABS.map(({ href, label, icon: Icon }) => {
@@ -64,21 +71,25 @@ export function SideNav({ name, email }: { name: string | null; email: string })
             <Link
               key={href}
               href={href}
-              className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+              className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
                 active
-                  ? "bg-secondary/60 text-foreground"
+                  ? "text-foreground"
                   : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
               }`}
             >
               {active ? (
-                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                <motion.span
+                  layoutId="sideNavActive"
+                  className="absolute inset-0 rounded-xl bg-secondary/70"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                />
               ) : null}
               <Icon
                 size={18}
                 strokeWidth={1.75}
-                className={active ? "text-primary" : ""}
+                className={`relative ${active ? "text-primary" : ""}`}
               />
-              {label}
+              <span className="relative">{label}</span>
             </Link>
           );
         })}
@@ -88,7 +99,7 @@ export function SideNav({ name, email }: { name: string | null; email: string })
         href="/profile"
         className="mt-auto flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-secondary/60"
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-medium text-primary">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary font-serif text-base italic text-primary">
           {initial}
         </div>
         <div className="min-w-0 flex-1">

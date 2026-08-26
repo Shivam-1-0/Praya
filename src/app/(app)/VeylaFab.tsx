@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Sparkles, X, Send, RotateCcw } from "lucide-react";
 import {
   loadVeylaThread,
@@ -18,6 +19,7 @@ export function VeylaFab() {
   const [loaded, setLoaded] = useState(false);
   const [pending, startTransition] = useTransition();
   const listRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReducedMotion();
 
   // Load the most recent conversation the first time the panel is opened.
   useEffect(() => {
@@ -71,8 +73,15 @@ export function VeylaFab() {
 
   return (
     <div className="fixed bottom-24 right-5 z-30 md:bottom-6 md:right-6">
+      <AnimatePresence>
       {open ? (
-        <div className="mb-3 flex h-[28rem] w-80 flex-col rounded-2xl border border-border bg-card shadow-lg md:w-96">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.92, y: 12 }}
+          transition={{ type: "spring", stiffness: 320, damping: 30 }}
+          style={{ transformOrigin: "bottom right" }}
+          className="mb-3 flex h-[28rem] w-80 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg md:w-96">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-primary" />
@@ -174,17 +183,35 @@ export function VeylaFab() {
               <Send size={14} />
             </button>
           </form>
-        </div>
+        </motion.div>
       ) : null}
+      </AnimatePresence>
 
-      <button
+      <motion.button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Open Veyla"
-        className="ml-auto flex size-14 items-center justify-center rounded-full border-2 border-primary bg-card text-primary transition-colors hover:bg-primary/10"
+        aria-label={open ? "Close Veyla" : "Open Veyla"}
+        whileTap={{ scale: 0.9 }}
+        className="relative ml-auto flex size-14 items-center justify-center rounded-full bg-foreground text-accent shadow-lg"
       >
-        <Sparkles size={22} strokeWidth={1.75} />
-      </button>
+        {/* Breathing ring — quiet, invites without nagging. Off under reduced motion. */}
+        {!open && !reduceMotion ? (
+          <motion.span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-full border border-accent"
+            initial={{ opacity: 0.5, scale: 1 }}
+            animate={{ opacity: 0, scale: 1.35 }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+          />
+        ) : null}
+        <motion.span
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={{ type: "spring", stiffness: 400, damping: 24 }}
+          style={{ display: "flex" }}
+        >
+          {open ? <X size={22} strokeWidth={1.75} /> : <Sparkles size={22} strokeWidth={1.75} />}
+        </motion.span>
+      </motion.button>
     </div>
   );
 }
