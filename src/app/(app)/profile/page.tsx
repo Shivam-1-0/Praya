@@ -84,22 +84,27 @@ export default async function ProfilePage() {
         subtitle="Your account details and connected keys."
       />
 
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Account</p>
-        <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs text-muted-foreground">Email</dt>
-            <dd className="mt-1 text-sm">{user?.email}</dd>
+      <section className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center gap-4">
+          <div
+            className="flex size-14 shrink-0 items-center justify-center rounded-full bg-secondary font-serif text-2xl italic text-primary"
+            style={{ boxShadow: "0 0 0 0.5px var(--accent), 0 0 0 4px var(--card), 0 0 0 4.5px var(--border)" }}
+          >
+            {(profile?.display_name || user?.email || "?").charAt(0).toUpperCase()}
           </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Name</dt>
-            <dd className="mt-1 text-sm">{profile?.display_name || "Not set"}</dd>
+          <div className="min-w-0">
+            <p className="font-serif text-2xl leading-tight">
+              {profile?.display_name || "Your account"}
+            </p>
+            <p className="truncate font-mono text-xs text-muted-foreground">{user?.email}</p>
           </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Timezone</dt>
-            <dd className="mt-1 text-sm">{profile?.timezone}</dd>
-          </div>
-        </dl>
+        </div>
+        <div className="mt-5 flex items-center gap-2 border-t border-border pt-4">
+          <span className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
+            Timezone
+          </span>
+          <span className="text-sm">{profile?.timezone}</span>
+        </div>
       </section>
 
       <ReflectionsExport reflections={reflections} />

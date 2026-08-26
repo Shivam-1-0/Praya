@@ -64,7 +64,7 @@ export function ApiKeysPanel({ keys }: { keys: ApiKeyRow[] }) {
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">API keys</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">API keys</p>
         <Chip>{keys.length}</Chip>
       </div>
       <p className="text-sm text-muted-foreground">

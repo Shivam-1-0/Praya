@@ -35,7 +35,7 @@ export function ReflectionsExport({ reflections }: { reflections: ReflectionRow[
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Reflections</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">Reflections</p>
         <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
           {reflections.length}
         </span>

@@ -74,7 +74,7 @@ export function AccountReset({ reflections }: { reflections: ReflectionRow[] }) 
     <section className="rounded-2xl border border-destructive/40 bg-card p-5">
       <div className="mb-1 flex items-center gap-2">
         <AlertTriangle size={14} className="text-destructive" />
-        <p className="text-xs uppercase tracking-[0.2em] text-destructive">Danger zone</p>
+        <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-destructive">Danger zone</p>
       </div>
       <p className="text-sm text-muted-foreground">
         Reset your account back to a blank slate. Your habits, tasks, completions,
