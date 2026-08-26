@@ -1,35 +1,26 @@
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/session";
 import { getTodayInTimezone } from "@/lib/today";
 import { PageHeader } from "@/components/PageHeader";
 import { HabitsClient } from "./HabitsClient";
 
 export default async function HabitsPage() {
-  const supabase = await getSupabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user, timezone } = await getSessionUser();
+  const today = getTodayInTimezone(timezone);
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("timezone")
-    .eq("user_id", user!.id)
-    .single();
-
-  const today = getTodayInTimezone(profile?.timezone ?? "UTC");
-
-  const { data: habits } = await supabase
-    .from("habits")
-    .select("id, title, description, frequency_type, custom_days, target_count, is_important, archived_at")
-    .eq("user_id", user!.id)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  const { data: comps } = await supabase
-    .from("completions")
-    .select("item_id")
-    .eq("user_id", user!.id)
-    .eq("item_type", "habit")
-    .eq("completion_date", today);
+  const [{ data: habits }, { data: comps }] = await Promise.all([
+    supabase
+      .from("habits")
+      .select("id, title, description, frequency_type, custom_days, target_count, is_important, archived_at")
+      .eq("user_id", user.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("completions")
+      .select("item_id")
+      .eq("user_id", user.id)
+      .eq("item_type", "habit")
+      .eq("completion_date", today),
+  ]);
 
   const doneSet = new Set((comps ?? []).map((c) => c.item_id));
 

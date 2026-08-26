@@ -1,53 +1,47 @@
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/session";
 import { getTodayInTimezone, getWeekStart } from "@/lib/today";
 import { isHabitScheduledOn } from "@/lib/habits";
 import { getGreeting, formatTodayLong, formatWeekday } from "@/lib/greeting";
 import { TodayClient } from "./TodayClient";
 
 export default async function TodayPage() {
-  const supabase = await getSupabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, timezone")
-    .eq("user_id", user!.id)
-    .single();
-
-  const tz = profile?.timezone ?? "UTC";
+  const { supabase, user, displayName, timezone: tz } = await getSessionUser();
   const today = getTodayInTimezone(tz);
 
   const weekStart = getWeekStart(today);
 
-  const { data: habitsRaw } = await supabase
-    .from("habits")
-    .select("id, title, frequency_type, custom_days, target_count, is_important")
-    .eq("user_id", user!.id)
-    .is("archived_at", null)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  const { data: tasksRaw } = await supabase
-    .from("tasks")
-    .select("id, title, priority")
-    .eq("user_id", user!.id)
-    .is("archived_at", null)
-    .eq("due_date", today)
-    .order("created_at", { ascending: true });
-
-  const [{ data: weekComps }, { data: review }] = await Promise.all([
+  // All four data queries in parallel — Supabase RTT is the biggest cost per
+  // tab switch, so we collapse four chained round-trips into one.
+  const [
+    { data: habitsRaw },
+    { data: tasksRaw },
+    { data: weekComps },
+    { data: review },
+  ] = await Promise.all([
+    supabase
+      .from("habits")
+      .select("id, title, frequency_type, custom_days, target_count, is_important")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("tasks")
+      .select("id, title, priority")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .eq("due_date", today)
+      .order("created_at", { ascending: true }),
     supabase
       .from("completions")
       .select("item_type, item_id, completion_date")
-      .eq("user_id", user!.id)
+      .eq("user_id", user.id)
       .gte("completion_date", weekStart)
       .lte("completion_date", today),
     supabase
       .from("day_reviews")
       .select("day_score, completed_at")
-      .eq("user_id", user!.id)
+      .eq("user_id", user.id)
       .eq("review_date", today)
       .maybeSingle(),
   ]);
@@ -86,7 +80,7 @@ export default async function TodayPage() {
     <TodayClient
       weekday={formatWeekday(tz)}
       greeting={getGreeting(tz)}
-      name={profile?.display_name ?? null}
+      name={displayName}
       dateLabel={formatTodayLong(tz)}
       today={today}
       habits={habits}

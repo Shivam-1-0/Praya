@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/session";
 import { getTodayInTimezone, lastNDates } from "@/lib/today";
 import { PageHeader } from "@/components/PageHeader";
 import { frequencyLabel } from "@/lib/habits";
@@ -24,18 +24,7 @@ export default async function AnalyticsPage({
   const winKey = sp.window && WINDOWS[sp.window] ? sp.window : "30";
   const windowDays = WINDOWS[winKey].days;
 
-  const supabase = await getSupabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("timezone")
-    .eq("user_id", user!.id)
-    .single();
-
-  const tz = profile?.timezone ?? "UTC";
+  const { supabase, user, timezone: tz } = await getSessionUser();
   const today = getTodayInTimezone(tz);
   const windowDates = lastNDates(today, windowDays);
   const windowStart = windowDates[0];
@@ -45,25 +34,25 @@ export default async function AnalyticsPage({
       supabase
         .from("habits")
         .select("id, title, frequency_type, custom_days, target_count, is_important, created_at")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .is("archived_at", null)
         .order("is_important", { ascending: false })
         .order("created_at", { ascending: true }),
       supabase
         .from("completions")
         .select("item_id, completion_date")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .eq("item_type", "habit"),
       supabase
         .from("day_review_items")
         .select("item_id, is_valid")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .eq("item_type", "habit")
         .gte("created_at", `${windowStart}T00:00:00Z`),
       supabase
         .from("day_reviews")
         .select("review_date, day_score")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .gte("review_date", windowStart)
         .order("review_date", { ascending: true }),
     ]);

@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/session";
 import { getTodayInTimezone } from "@/lib/today";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
@@ -7,46 +7,36 @@ import { ReflectionsExport, type ReflectionRow } from "./ReflectionsExport";
 import { AccountReset } from "./AccountReset";
 
 export default async function ProfilePage() {
-  const supabase = await getSupabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, timezone")
-    .eq("user_id", user!.id)
-    .single();
-
-  const today = getTodayInTimezone(profile?.timezone ?? "UTC");
+  const { supabase, user, displayName, timezone } = await getSessionUser();
+  const today = getTodayInTimezone(timezone);
 
   const [{ data: keys }, { data: reviews }, { data: reviewItems }, { data: habits }, { data: tasks }] =
     await Promise.all([
       supabase
         .from("api_keys")
         .select("id, name, key_prefix, last_used_at, created_at")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .is("revoked_at", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("day_reviews")
         .select("id, review_date, satisfaction_rating, reflection_text, day_score")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .not("completed_at", "is", null)
         .lte("review_date", today)
         .order("review_date", { ascending: false }),
       supabase
         .from("day_review_items")
         .select("day_review_id, item_type, item_id, reason_text, is_valid")
-        .eq("user_id", user!.id),
+        .eq("user_id", user.id),
       supabase
         .from("habits")
         .select("id, title")
-        .eq("user_id", user!.id),
+        .eq("user_id", user.id),
       supabase
         .from("tasks")
         .select("id, title")
-        .eq("user_id", user!.id),
+        .eq("user_id", user.id),
     ]);
 
   const habitTitles = new Map((habits ?? []).map((h) => [h.id, h.title]));
@@ -90,11 +80,11 @@ export default async function ProfilePage() {
             className="flex size-14 shrink-0 items-center justify-center rounded-full bg-secondary font-serif text-2xl italic text-primary"
             style={{ boxShadow: "0 0 0 0.5px var(--accent), 0 0 0 4px var(--card), 0 0 0 4.5px var(--border)" }}
           >
-            {(profile?.display_name || user?.email || "?").charAt(0).toUpperCase()}
+            {(displayName || user.email || "?").charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
             <p className="font-serif text-2xl leading-tight">
-              {profile?.display_name || "Your account"}
+              {displayName || "Your account"}
             </p>
             <p className="truncate font-mono text-xs text-muted-foreground">{user?.email}</p>
           </div>
@@ -103,7 +93,7 @@ export default async function ProfilePage() {
           <span className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
             Timezone
           </span>
-          <span className="text-sm">{profile?.timezone}</span>
+          <span className="text-sm">{timezone}</span>
         </div>
       </section>
 

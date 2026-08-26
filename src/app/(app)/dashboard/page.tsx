@@ -1,44 +1,32 @@
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/session";
 import { getTodayInTimezone, getWeekStart, getWeekEnd, lastNDates } from "@/lib/today";
 import { countsTowardDayScore } from "@/lib/habits";
 import { PageHeader } from "@/components/PageHeader";
 
 export default async function DashboardPage() {
-  const supabase = await getSupabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("timezone")
-    .eq("user_id", user!.id)
-    .single();
-
-  const tz = profile?.timezone ?? "UTC";
+  const { supabase, user, timezone: tz } = await getSessionUser();
   const today = getTodayInTimezone(tz);
   const week = lastNDates(today, 7);
-
   const weekStart = getWeekStart(today);
 
-  const { data: habits } = await supabase
-    .from("habits")
-    .select("id, frequency_type, custom_days, target_count, is_important")
-    .eq("user_id", user!.id)
-    .is("archived_at", null);
-
-  const { data: tasksToday } = await supabase
-    .from("tasks")
-    .select("id")
-    .eq("user_id", user!.id)
-    .is("archived_at", null)
-    .eq("due_date", today);
-
-  const { data: compsWeek } = await supabase
-    .from("completions")
-    .select("item_type, item_id, completion_date")
-    .eq("user_id", user!.id)
-    .gte("completion_date", week[0]);
+  const [{ data: habits }, { data: tasksToday }, { data: compsWeek }] = await Promise.all([
+    supabase
+      .from("habits")
+      .select("id, frequency_type, custom_days, target_count, is_important")
+      .eq("user_id", user.id)
+      .is("archived_at", null),
+    supabase
+      .from("tasks")
+      .select("id")
+      .eq("user_id", user.id)
+      .is("archived_at", null)
+      .eq("due_date", today),
+    supabase
+      .from("completions")
+      .select("item_type, item_id, completion_date")
+      .eq("user_id", user.id)
+      .gte("completion_date", week[0]),
+  ]);
 
   const habitCountBeforeToday = new Map<string, number>();
   const habitDoneToday = new Set<string>();
