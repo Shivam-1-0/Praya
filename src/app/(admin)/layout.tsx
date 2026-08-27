@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Shield, LayoutGrid, Users, ScrollText } from "lucide-react";
+import { LayoutGrid, Users, ScrollText } from "lucide-react";
+import { PrayaMark } from "@/components/PrayaMark";
 import { requireAdmin } from "@/lib/admin/guard";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -10,9 +11,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
-            <Shield size={16} className="text-primary" />
-            <Link href="/admin" className="font-serif text-lg italic">
-              Praya <span className="text-muted-foreground">Admin</span>
+            <Link href="/admin" className="flex items-center gap-3">
+              <PrayaMark width={38} className="text-primary" />
+              <span className="font-serif text-lg italic text-muted-foreground">
+                Admin
+              </span>
             </Link>
           </div>
           <div className="flex items-center gap-6 text-sm">

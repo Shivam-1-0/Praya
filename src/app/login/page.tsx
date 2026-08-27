@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Mail } from "lucide-react";
+import { PrayaMark } from "@/components/PrayaMark";
 import { sendMagicLink } from "./actions";
 
 type SearchParams = { sent?: string; error?: string; next?: string };
@@ -25,14 +26,9 @@ export default async function LoginPage({
           />
 
           <div className="relative text-center">
-            <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-muted-foreground">
-              Praya
-            </p>
-            <p className="mt-5 text-accent" style={{ letterSpacing: "0.5em" }}>
-              ·
-            </p>
+            <PrayaMark width={62} className="mx-auto text-accent" />
 
-            <h1 className="mt-4 font-serif text-4xl font-normal tracking-tight text-background">
+            <h1 className="mt-8 font-serif text-4xl font-normal tracking-tight text-background">
               Welcome back.
             </h1>
             <p className="mt-1 font-serif text-lg italic text-muted-foreground">

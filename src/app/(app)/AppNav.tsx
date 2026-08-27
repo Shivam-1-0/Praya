@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
+import { PrayaMark } from "@/components/PrayaMark";
 import {
   CalendarCheck,
   ListChecks,
@@ -62,7 +63,9 @@ export function SideNav({ name, email }: { name: string | null; email: string })
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border px-4 py-6 md:flex">
-      <span className="mb-9 px-3 font-serif text-2xl italic text-primary">Praya</span>
+      <Link href="/today" className="mb-9 px-3 text-primary">
+        <PrayaMark width={56} />
+      </Link>
 
       <nav className="flex flex-col gap-1">
         {TABS.map(({ href, label, icon: Icon }) => {

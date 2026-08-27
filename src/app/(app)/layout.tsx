@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ViewTransition } from "react";
 import { User } from "lucide-react";
 import { getSessionUser } from "@/lib/session";
+import { PrayaMark } from "@/components/PrayaMark";
 import { BottomNav, SideNav } from "./AppNav";
 import { TimezoneSync } from "./TimezoneSync";
 import { VeylaFab } from "./VeylaFab";
@@ -20,8 +21,8 @@ export default async function AppLayout({
       <div className="min-w-0 flex-1">
         <header className="border-b border-border md:hidden">
           <div className="mx-auto flex max-w-md items-center justify-between px-5 py-4">
-            <Link href="/today" className="font-serif text-xl italic text-primary">
-              Praya
+            <Link href="/today" className="text-primary">
+              <PrayaMark width={46} />
             </Link>
             <Link
               href="/profile"

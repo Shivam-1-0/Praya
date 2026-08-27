@@ -1,17 +1,13 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { PrayaMark } from "@/components/PrayaMark";
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-foreground">
       <div className="w-full max-w-sm text-center">
-        <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-muted-foreground">
-          Praya
-        </p>
-        <p className="mt-6 text-accent" style={{ letterSpacing: "0.5em" }}>
-          ·
-        </p>
-        <h1 className="mt-5 font-serif text-5xl font-normal leading-[1.05] tracking-tight md:text-6xl">
+        <PrayaMark width={76} className="mx-auto text-primary" />
+        <h1 className="mt-10 font-serif text-5xl font-normal leading-[1.05] tracking-tight md:text-6xl">
           Plan. Execute.
           <br />
           <span className="italic text-primary">Reflect.</span>
